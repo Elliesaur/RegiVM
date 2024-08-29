@@ -397,5 +397,3 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 musings.txt
-/AsmResolver
-/Echo
