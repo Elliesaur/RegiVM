@@ -11,6 +11,11 @@
 - Step through each OpCode, send to handler for that OpCode.
 - Any reference to a register is loaded from the heap. 
 
+## But how does it make my closed-source obfuscator better?
+- It does not.
+- This is a small project which is only just starting. 
+- Right now, the only thing it does is read a method from the TestProgram class and nothing else. 
+- Idea is to make a "VM Protection" in the future and add it to [ProwlynxNET](https://github.com/prowlynx/ProwlynxNET).
 
 ## Problems?
 - Yeah, it is rather crap.
