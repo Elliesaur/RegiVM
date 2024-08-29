@@ -40,5 +40,5 @@ This is very basic for now.
 
 # Dependencies
 - The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).
-- The even lovlier [Echo](https://github.com/Washi1337/Echo) (which currently isn't used to its full potential... >:c).
+- The even lovelier [Echo](https://github.com/Washi1337/Echo) (which currently isn't used to its full potential... >:c).
 
