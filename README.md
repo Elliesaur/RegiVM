@@ -22,6 +22,7 @@
 - Yeah, it is inefficient.
 - Yeah, it isn't quite perfect.
 - Yeah, it doesn't support every operation.
+- Open an issue, make a PR, be a *developer*.
 
 # Operands/OpCodes
 This is very basic for now.
