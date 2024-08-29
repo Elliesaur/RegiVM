@@ -10,6 +10,8 @@ namespace RegiVM.VMBuilder.Registers
     public class RegisterHelper
     {
         public List<VMRegister> Registers { get; } = new List<VMRegister>();
+        public Stack<VMRegister> Temporary { get; } = new Stack<VMRegister>();
+
         public int Used => Registers.Count(x => x.InUse);
         public int Free => Registers.Count(x => !x.InUse);
 
@@ -17,22 +19,35 @@ namespace RegiVM.VMBuilder.Registers
         {
             for (int i = 0; i < numRegisters; i++)
             {
-                Registers.Add(new VMRegister($"RGI{i}"));
+                Registers.Add(new VMRegister($"RGI{i}", RegisterType.LocalVariable));
             }
         }
 
-        public VMRegister ForPush(int depthBeforeChange, int push, int pop)
+        public VMRegister ForPush(int depth, int push, int pop)
         {
-            return Registers[depthBeforeChange];
+            Console.WriteLine($"PUSH - Depth: {depth}");
+            // Get a free register, instead of relying on depth being the index of the register to use.
+            var reg = GetFree();
+            reg.StackPosition = depth;
+            return reg;
         }
 
-        public VMRegister ForPop(int depthAfterChange, int push, int pop)
+        public VMRegister ForPop(int depth, int push, int pop)
         {
-            return Registers[depthAfterChange];
+            Console.WriteLine($"POP - Depth: {depth}");
+            var reg = Registers.Reverse<VMRegister>().First(x => x.StackPosition == depth);
+            return reg;
+        }
+
+        public VMRegister ForTemp()
+        {
+            var reg = new VMRegister($"Temp{Guid.NewGuid().ToString()}", RegisterType.Temporary);
+            Temporary.Push(reg);
+            return reg;
         }
 
         // TODO: Remove.
-        public VMRegister GetFree()
+        private VMRegister GetFree()
         {
             var available = Registers.First(x => !x.InUse);
             available.InUse = true;

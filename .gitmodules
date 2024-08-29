@@ -1,0 +1,6 @@
+[submodule "Echo"]
+	path = Echo
+	url = https://github.com/Washi1337/Echo.git
+[submodule "AsmResolver"]
+	path = AsmResolver
+	url = https://github.com/Washi1337/AsmResolver.git

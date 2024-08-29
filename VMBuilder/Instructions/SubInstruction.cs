@@ -17,16 +17,12 @@ namespace RegiVM.VMBuilder.Instructions
         public SubInstruction(VMCompiler compiler, CilInstruction inst, CilLocalVariable? localVar)
         {
             Registers = compiler.RegisterHelper;
-            // Get last two registers.
-            var regs = Registers.GetLastUsed(2);
-            regs.Reverse();
+            Reg1 = Registers.ForPop(compiler.ProcessedDepth - 2, compiler.Push, compiler.Pop);
+            Reg2 = Registers.ForPop(compiler.ProcessedDepth - 1, compiler.Push, compiler.Pop);
 
-            Reg1 = regs[0];
-            Reg2 = regs[1];
+            Registers.Reset([Reg1, Reg2]);
 
-            Registers.Reset(regs);
-
-            ToPushReg = Registers.GetFree();
+            ToPushReg = Registers.ForPush(compiler.ProcessedDepth, compiler.Push, compiler.Pop);
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
             ToPushReg.DataType = Reg1.DataType;

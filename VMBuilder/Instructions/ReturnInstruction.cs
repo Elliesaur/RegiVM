@@ -5,7 +5,7 @@ namespace RegiVM.VMBuilder.Instructions
     public class ReturnInstruction : VMInstruction
     {
         public override ulong OpCode { get; }
-        public VMRegister Reg1 { get; }
+        public VMRegister TempReg1 { get; }
         public bool HasReturnValue { get; }
         public override byte[] ByteCode { get; }
 
@@ -17,11 +17,11 @@ namespace RegiVM.VMBuilder.Instructions
 
             if (HasReturnValue)
             {
-                Reg1 = Registers.GetLastUsed(1)[0];
+                TempReg1 = Registers.Temporary.Pop();
             }
             else
             {
-                Reg1 = null!;
+                TempReg1 = null!;
             }
 
             ByteCode = ToByteArray();
@@ -29,7 +29,7 @@ namespace RegiVM.VMBuilder.Instructions
 
         public override byte[] ToByteArray()
         {
-            Console.WriteLine($"RETURN {(Reg1 == null ? "void" : Reg1)}");
+            Console.WriteLine($"RETURN {(TempReg1 == null ? "void" : TempReg1)}");
 
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
@@ -37,8 +37,8 @@ namespace RegiVM.VMBuilder.Instructions
                 writer.Write(HasReturnValue);
                 if (HasReturnValue)
                 {
-                    writer.Write(Reg1.RawName.Length);
-                    writer.Write(Reg1.RawName);
+                    writer.Write(TempReg1!.RawName.Length);
+                    writer.Write(TempReg1!.RawName);
                 }
                 return memStream.ToArray();
             }

@@ -18,7 +18,7 @@ namespace RegiVM.VMBuilder.Instructions
             
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ParameterLoad;
-            Reg1 = Registers.GetFree();
+            Reg1 = Registers.ForPush(compiler.PreviousDepth, compiler.Push, compiler.Pop);
 
             Reg1.Param = param;
             Reg1.LastOffsetUsed = 0;
