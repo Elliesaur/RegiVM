@@ -33,6 +33,6 @@ This is very basic for now.
 - Repeat for SUB, MUL, DIV, XOR, AND, OR
 
 # Dependencies
-- The lovely AsmResolver.
+- The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).
 - The even lovlier [Echo](https://github.com/Washi1337/Echo) (which currently isn't used to its full potential... >:c).
 
