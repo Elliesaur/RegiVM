@@ -22,14 +22,18 @@ namespace RegiVM.VMBuilder.Instructions
             LocalVar = localVar;
 
             TempReg1 = Registers.Temporary.Pop();
-            
+
             if (Registers.Registers.Any(x => x.LocalVar == localVar))
             {
-                Debugger.Break();
-                throw new Exception("Already an existing register for the local variable!");
+                //Debugger.Break();
+                //throw new Exception("Already an existing register for the local variable!");
+                // Load the existing register for that local variable.
+                Reg1 = Registers.Registers.First(x => x.LocalVar == localVar);
             }
-
-            Reg1 = Registers.ForPush(compiler.PreviousDepth, compiler.Push, compiler.Pop);
+            else
+            {
+                Reg1 = Registers.ForPush(compiler.PreviousDepth, compiler.Push, compiler.Pop);
+            }
             Reg1.LastOffsetUsed = Inst.Offset;
             Reg1.OriginalOffset = Inst.Offset;
             Reg1.DataType = TempReg1.DataType;

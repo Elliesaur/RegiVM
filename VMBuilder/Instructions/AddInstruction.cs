@@ -17,8 +17,8 @@ namespace RegiVM.VMBuilder.Instructions
         {
             Registers = compiler.RegisterHelper;
             // Get last two registers.
-            var rawReg1 = Registers.Temporary.Pop();
             var rawReg2 = Registers.Temporary.Pop();
+            var rawReg1 = Registers.Temporary.Pop();
             Reg1 = new VMRegister(rawReg1);
             Reg2 = new VMRegister(rawReg2);
 

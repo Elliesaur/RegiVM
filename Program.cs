@@ -53,11 +53,16 @@ namespace RegiVM
         }
 
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
-        public static int Math4()
+        public static int Math4(int arg1, int arg2)
         {
-            int a = 1 + 2;
-
-            return 1;
+            int a = 1;
+            int b = 2;
+            int c = a + b;
+            int d = c * 10;
+            d = d + arg1;
+            d = d - arg2;
+            
+            return d + c;
         }
     }
 
@@ -67,23 +72,23 @@ namespace RegiVM
         {
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
-            //var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            //var testMd = testType.Methods.First(x => x.Name == "Math4");
-            var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
-            testMd.CilMethodBody = new CilMethodBody(testMd);
-            testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
-            testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(2));
-            testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
-            testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(3));
-            testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
-            testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
-            testMd.CilMethodBody.Instructions.CalculateOffsets();
-            testMd.CilMethodBody.ComputeMaxStack();
-            
+            var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
+            var testMd = testType.Methods.First(x => x.Name == "Math4");
+            //var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
+            //testMd.CilMethodBody = new CilMethodBody(testMd);
+            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
+            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(2));
+            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
+            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(3));
+            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
+            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
+            //testMd.CilMethodBody.Instructions.CalculateOffsets();
+            //testMd.CilMethodBody.ComputeMaxStack();
+
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .RegisterLimit(30);
-                //.RandomizeRegisterNames();
+                .RegisterLimit(30)
+                .RandomizeRegisterNames();
             byte[] data = compiler.Compile(testMd);
 
             Console.WriteLine($"Sizeof Data {data.Length} bytes");
@@ -137,6 +142,8 @@ namespace RegiVM
                     h[regName] = endResult;
                 }
             });
+            // Yes, technically and definitely the maths opcodes can all be one fucking OPCODE OKAY
+            // BUT I CANT BE FUCKED RIGHT NOW OK >:C
             vm.OpCodeHandlers.Add(compiler.OpCodes.Add, (t, h, d, _) =>
             {
                 // ADD 
@@ -367,7 +374,7 @@ namespace RegiVM
                 }
             });
 
-            var actualResult = TestProgram.Math4();
+            var actualResult = TestProgram.Math4(50, 60);
             Console.WriteLine(actualResult);
 
             vm.Run();

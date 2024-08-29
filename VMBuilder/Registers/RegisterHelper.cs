@@ -12,14 +12,18 @@ namespace RegiVM.VMBuilder.Registers
         public List<VMRegister> Registers { get; } = new List<VMRegister>();
         public Stack<VMRegister> Temporary { get; } = new Stack<VMRegister>();
 
+        public bool IsRandomNames { get; set; } = false;
+
         public int Used => Registers.Count(x => x.InUse);
         public int Free => Registers.Count(x => !x.InUse);
+
+        private int _numTempTotalLife = 0;
 
         public RegisterHelper(int numRegisters)
         {
             for (int i = 0; i < numRegisters; i++)
             {
-                Registers.Add(new VMRegister($"RGI{i}", RegisterType.LocalVariable));
+                Registers.Add(new VMRegister($"R{i}", RegisterType.LocalVariable));
             }
         }
 
@@ -32,7 +36,8 @@ namespace RegiVM.VMBuilder.Registers
             return reg;
         }
 
-        public VMRegister ForPop(int depth, int push, int pop)
+        // TODO: Bad Ellie, bad! REMOVE!
+        private VMRegister ForPop(int depth, int push, int pop)
         {
             Console.WriteLine($"POP - Depth: {depth}");
             var reg = Registers.Reverse<VMRegister>().First(x => x.StackPosition == depth);
@@ -41,25 +46,16 @@ namespace RegiVM.VMBuilder.Registers
 
         public VMRegister ForTemp()
         {
-            var reg = new VMRegister($"Temp{Guid.NewGuid().ToString()}", RegisterType.Temporary);
+            var reg = new VMRegister(IsRandomNames ? $"{Guid.NewGuid().ToString()}" : $"Temp_{_numTempTotalLife++}", RegisterType.Temporary);
             Temporary.Push(reg);
             return reg;
         }
 
-        // TODO: Remove.
         private VMRegister GetFree()
         {
             var available = Registers.First(x => !x.InUse);
             available.InUse = true;
             return available;
-        }
-
-        public List<VMRegister> GetLastUsed(int count)
-        {
-            return Registers.Where(x => x.InUse)
-                .OrderByDescending(x => x.LastOffsetUsed)
-                .Take(count)
-                .ToList();
         }
 
         public void Reset(IEnumerable<VMRegister> regs)
@@ -89,6 +85,7 @@ namespace RegiVM.VMBuilder.Registers
                 reg.Name = Guid.NewGuid().ToString();
                 reg.RawName = VMRegister.ToUtf8Bytes(reg.Name);
             }
+            IsRandomNames = true;
         }
     }
 }

@@ -75,7 +75,7 @@ namespace RegiVM.VMBuilder.Registers
             StackPosition = -50;
         }
 
-        public override string ToString() => $"R({StackPosition} - {Name})";
+        public override string ToString() => $"{(RegisterType == RegisterType.Temporary ? "T" : "R")}({Name})";
 
         public void TempCopyFrom(VMRegister other)
         {

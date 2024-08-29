@@ -12,17 +12,16 @@ namespace RegiVM.VMBuilder.Instructions
         public VMRegister Reg1 { get; }
         public override byte[] ByteCode { get; }
 
-        public ParamLoadInstruction(VMCompiler compiler, int paramOffset, DataType paramDataType, Parameter param)
+        public ParamLoadInstruction(VMCompiler compiler, int paramOffset, DataType paramDataType, Parameter param, CilInstruction inst)
         {
             ParamOffset = paramOffset;
             
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ParameterLoad;
-            Reg1 = Registers.ForPush(compiler.PreviousDepth, compiler.Push, compiler.Pop);
-
+            Reg1 = Registers.ForTemp();
             Reg1.Param = param;
-            Reg1.LastOffsetUsed = 0;
-            Reg1.OriginalOffset = 0;
+            Reg1.LastOffsetUsed = inst.Offset;
+            Reg1.OriginalOffset = inst.Offset;
             Reg1.DataType = paramDataType;
 
             ByteCode = ToByteArray();

@@ -8,33 +8,28 @@ namespace RegiVM.VMBuilder.Instructions
     {
         public override ulong OpCode { get; }
         public CilInstruction Inst { get; }
-        public CilLocalVariable? LocalVar { get; }
         public VMRegister Reg1 { get; }
         public VMRegister Reg2 { get; }
         public VMRegister ToPushReg { get; }
         public override byte[] ByteCode { get; }
 
-        public MulInstruction(VMCompiler compiler, CilInstruction inst, CilLocalVariable? localVar)
+        public MulInstruction(VMCompiler compiler, CilInstruction inst)
         {
             Registers = compiler.RegisterHelper;
-            Reg1 = Registers.ForPop(compiler.ProcessedDepth - 2, compiler.Push, compiler.Pop);
-            Reg2 = Registers.ForPop(compiler.ProcessedDepth - 1, compiler.Push, compiler.Pop);
+            // Get last two registers.
+            var rawReg2 = Registers.Temporary.Pop();
+            var rawReg1 = Registers.Temporary.Pop();
+            Reg1 = new VMRegister(rawReg1);
+            Reg2 = new VMRegister(rawReg2);
 
-            Registers.Reset([Reg1, Reg2]);
+            //Registers.Reset([rawReg1, rawReg2]);
 
-            ToPushReg = Registers.ForPush(compiler.ProcessedDepth, compiler.Push, compiler.Pop);
+            ToPushReg = Registers.ForTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
             ToPushReg.DataType = Reg1.DataType;
 
-            // Check if next instruction is storing, and if so, track the variable
-            if (LocalVar != null)
-            {
-                ToPushReg.LocalVar = LocalVar;
-            }
-
             Inst = inst;
-            LocalVar = localVar;
             OpCode = compiler.OpCodes.Mul;
 
             ByteCode = ToByteArray();

@@ -91,23 +91,10 @@ namespace RegiVM.VMBuilder
             var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
 
             method.CilMethodBody!.Instructions.ExpandMacros();
-            int processed = 0;
-            int paramCount = 0;
+            
             var walker = new VMAstWalker();
-            AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
+            //AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
 
-            //return new byte[0];
-            foreach (var param in method.Parameters)
-            {
-                //var typeName = param.ParameterType.ToTypeDefOrRef().Name;
-                //if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
-                //{
-                //    throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
-                //}
-
-                //var paramLoad = new ParamLoadInstruction(this, paramCount++, (DataType)dataType, param);
-                //InstructionBuilder.Add(paramLoad);
-            }
             var b = blocks.GetAllBlocks().ToList();
             
             for (int i = 0; i < b.Count; i++)
@@ -324,6 +311,31 @@ namespace RegiVM.VMBuilder
                     var add = new AddInstruction(this, inst);
                     InstructionBuilder.Add(add);
                 }
+                if (inst.OpCode.Code == CilCode.Sub)
+                {
+                    var add = new SubInstruction(this, inst);
+                    InstructionBuilder.Add(add);
+                }
+                if (inst.OpCode.Code == CilCode.Mul)
+                {
+                    var add = new MulInstruction(this, inst);
+                    InstructionBuilder.Add(add);
+                }
+                if (inst.OpCode.Code == CilCode.Div)
+                {
+                    var add = new DivInstruction(this, inst);
+                    InstructionBuilder.Add(add);
+                }
+                if (inst.OpCode.Code == CilCode.And)
+                {
+                    var add = new AndInstruction(this, inst);
+                    InstructionBuilder.Add(add);
+                }
+                if (inst.OpCode.Code == CilCode.Xor)
+                {
+                    var add = new XorInstruction(this, inst);
+                    InstructionBuilder.Add(add);
+                }
 
                 if (inst.IsStloc())
                 {
@@ -337,6 +349,18 @@ namespace RegiVM.VMBuilder
                     var cilLocal = (CilLocalVariable)inst.Operand!;
                     var load = new LocalLoadInstruction(this, inst, cilLocal);
                     InstructionBuilder.Add(load);
+                }
+
+                if (inst.IsLdarg())
+                {
+                    var param = (Parameter)inst.Operand!;
+                    var typeName = param.ParameterType.ToTypeDefOrRef().Name;
+                    if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
+                    {
+                        throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
+                    }
+                    var p = new ParamLoadInstruction(this, param.Index, (DataType)dataType, param, inst);
+                    InstructionBuilder.Add(p);
                 }
 
                 if (inst.OpCode.Code == CilCode.Ret)
