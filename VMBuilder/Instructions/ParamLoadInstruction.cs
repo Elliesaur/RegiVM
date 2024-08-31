@@ -9,7 +9,7 @@ namespace RegiVM.VMBuilder.Instructions
     {
         public override ulong OpCode { get; }
         public int ParamOffset { get; }
-        public VMRegister Reg1 { get; }
+        public VMRegister TempReg1 { get; }
         public override byte[] ByteCode { get; }
 
         public ParamLoadInstruction(VMCompiler compiler, int paramOffset, DataType paramDataType, Parameter param, CilInstruction inst)
@@ -18,26 +18,26 @@ namespace RegiVM.VMBuilder.Instructions
             
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ParameterLoad;
-            Reg1 = Registers.ForTemp();
-            Reg1.Param = param;
-            Reg1.LastOffsetUsed = inst.Offset;
-            Reg1.OriginalOffset = inst.Offset;
-            Reg1.DataType = paramDataType;
+            TempReg1 = Registers.ForTemp();
+            TempReg1.Param = param;
+            TempReg1.LastOffsetUsed = inst.Offset;
+            TempReg1.OriginalOffset = inst.Offset;
+            TempReg1.DataType = paramDataType;
 
             ByteCode = ToByteArray();
         }
 
         public override byte[] ToByteArray()
         {
-            Console.WriteLine($"PARAMETER {Reg1.DataType} {Reg1}");
+            Console.WriteLine($"PARAMETER {TempReg1.DataType} {TempReg1}");
 
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
 
                 writer.Write(ParamOffset);
-                writer.Write((byte)Reg1.DataType);
-                writer.Write(Reg1.RawName);
+                writer.Write((byte)TempReg1.DataType);
+                writer.Write(TempReg1.RawName);
                 return memStream.ToArray();
             }
         }

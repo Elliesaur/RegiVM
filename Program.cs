@@ -73,7 +73,7 @@ namespace RegiVM
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Math4");
+            var testMd = testType.Methods.First(x => x.Name == "Math3");
             //var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
             //testMd.CilMethodBody = new CilMethodBody(testMd);
             //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
@@ -374,7 +374,7 @@ namespace RegiVM
                 }
             });
 
-            var actualResult = TestProgram.Math4(50, 60);
+            var actualResult = TestProgram.Math3(50, 60);
             Console.WriteLine(actualResult);
 
             vm.Run();

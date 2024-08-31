@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
+using AsmResolver.PE.DotNet.Cil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,6 +88,25 @@ namespace RegiVM.VMBuilder.Registers
             this.LocalVar = other.LocalVar;
             this.Param = other.Param;
             this.StackPosition = other.StackPosition;
+        }
+
+        public VMRegister FromInstruction(CilInstruction inst)
+        {
+            if (inst.IsLdcI4())
+            {
+                CurrentData = BitConverter.GetBytes((int)inst.Operand!);
+                DataType = DataType.Int32;
+                OriginalOffset = inst.Offset;
+                LastOffsetUsed = inst.Offset;
+            }
+            if (inst.OpCode.Code == CilCode.Ldstr)
+            {
+                CurrentData = Encoding.UTF8.GetBytes((string)inst.Operand!);
+                DataType = DataType.String;
+                OriginalOffset = inst.Offset;
+                LastOffsetUsed = inst.Offset;
+            }
+            return this;
         }
     }
 }

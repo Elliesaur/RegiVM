@@ -1,5 +1,6 @@
 ﻿using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
+using RegiVM.VMBuilder.Instructions;
 
 namespace RegiVM.VMBuilder
 {
@@ -8,7 +9,7 @@ namespace RegiVM.VMBuilder
         /// <inheritdoc />
         public override void EnterAssignmentStatement(AssignmentStatement<CilInstruction> statement) 
         {
-            Console.WriteLine("Enter assignment ");
+            //Console.WriteLine("Enter assignment ");
         }
 
         /// <inheritdoc />
@@ -129,7 +130,6 @@ namespace RegiVM.VMBuilder
         public override void EnterVariableExpression(VariableExpression<CilInstruction> expression)
         {
             Console.WriteLine("Enter Variable Expression " + expression);
-
         }
 
         /// <inheritdoc />
@@ -138,17 +138,19 @@ namespace RegiVM.VMBuilder
             Console.WriteLine("Exit Variable Expression " + expression);
         }
 
+        public VMCompiler Compiler { get; set; } = null!;
+
         /// <inheritdoc />
         public override void EnterInstructionExpression(InstructionExpression<CilInstruction> expression)
         {
             Console.WriteLine("Enter Instruction Expression " + expression);
+
         }
 
         /// <inheritdoc />
         public override void ExitInstructionExpression(InstructionExpression<CilInstruction> expression)
         {
             Console.WriteLine("Exit Instruction Expression " + expression);
-
         }
     }
 }

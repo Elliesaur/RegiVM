@@ -39,7 +39,9 @@ namespace RegiVM.VMBuilder
         UInt8 = 0x8,
 
         Int16 = 0x9,
-        UInt16 = 0x10
+        UInt16 = 0x10,
+
+        String = 0x11
     }
 
     public class VMCompiler
@@ -47,6 +49,8 @@ namespace RegiVM.VMBuilder
         public RegisterHelper RegisterHelper { get; private set; }
         
         public InstructionBuilder InstructionBuilder { get; }
+
+        public MethodDefinition CurrentMethod { get; private set; }
 
         public VMOpCode OpCodes { get; }
 
@@ -83,313 +87,193 @@ namespace RegiVM.VMBuilder
             return this;
         }
 
+        public class VMNodeVisitor : IAstNodeVisitor<CilInstruction, VMCompiler, VMRegister>
+        {
+
+            public VMRegister Visit(CompilationUnit<CilInstruction> unit, VMCompiler state)
+            {
+                return unit.Root.Accept(this, state);
+                //unit.Accept(this, state);
+            }
+
+            public VMRegister Visit(AssignmentStatement<CilInstruction> statement, VMCompiler state)
+            {
+                //statement.Accept(this, state);
+                return null!;
+            }
+
+            public VMRegister Visit(ExpressionStatement<CilInstruction> statement, VMCompiler state)
+            {
+                return statement.Expression.Accept(this, state);
+            }
+
+            public VMRegister Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
+            {
+                return null!;
+            }
+
+            public VMRegister Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
+            {
+                VMRegister reg = null;
+                foreach (var s in statement.Statements)
+                {
+                    reg = s.Accept(this, state);
+                }
+                return reg!;
+            }
+
+            public VMRegister Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
+            {
+                return null!;
+
+            }
+
+            public VMRegister Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
+            {
+                return null!;
+
+            }
+
+            public VMRegister Visit(InstructionExpression<CilInstruction> expression, VMCompiler state)
+            {
+                if (expression.Arguments.Count > 0)
+                {
+                    foreach (var a in expression.Arguments)
+                    {
+                        var r = a.Accept(this, state);
+                        if (r != null && !state.RegisterHelper.Temporary.Contains(r))
+                            // Push the register to the temp stack.
+                            state.RegisterHelper.Temporary.Push(r);
+                    }
+                    var inst = expression.Instruction;
+                    if (inst.IsStloc())
+                    {
+                        var storeInst = new LocalStoreInstruction(state, inst, (CilLocalVariable)inst.Operand!);
+                        state.InstructionBuilder.Add(storeInst);
+
+                        // Return the register that it is stored to.
+                        // But why would I return anything when the stack is empty after stloc??
+                        //return storeInst.Reg1;
+                    }
+                    // TODO: Combine into one math instruction, or use some reflection hacking to get the type name.
+                    if (inst.OpCode.Code == CilCode.Add)
+                    {
+                        var addInst = new AddInstruction(state, inst);
+                        state.InstructionBuilder.Add(addInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Sub)
+                    {
+                        var subInst = new SubInstruction(state, inst);
+                        state.InstructionBuilder.Add(subInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Mul)
+                    {
+                        var mulInst = new MulInstruction(state, inst);
+                        state.InstructionBuilder.Add(mulInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Div)
+                    {
+                        var divInst = new DivInstruction(state, inst);
+                        state.InstructionBuilder.Add(divInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.And)
+                    {
+                        var andInst = new AndInstruction(state, inst);
+                        state.InstructionBuilder.Add(andInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Or)
+                    {
+                        var orInst = new OrInstruction(state, inst);
+                        state.InstructionBuilder.Add(orInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Xor)
+                    {
+                        var xorInst = new XorInstruction(state, inst);
+                        state.InstructionBuilder.Add(xorInst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Ret)
+                    {
+                        var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
+                        state.InstructionBuilder.Add(retInst);
+                        // Lol, actually return something?
+                        return retInst.TempReg1;
+                    }
+                    return null!;
+                }
+                else
+                {
+                    var inst = expression.Instruction;
+                    VMRegister reg = null!;
+                    if (inst.IsLdcI4())
+                    {
+                        var numLoad = new NumLoadInstruction(state, (int)inst.Operand!, DataType.Int32, inst);
+                        state.InstructionBuilder.Add(numLoad);
+
+                        // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
+                        reg = numLoad.TempReg1;
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldstr)
+                    {
+                        // TODO: Ldstr support.
+                        // Shouldn't be too hard.
+                    }
+                    if (inst.IsLdloc())
+                    {
+                        var loadInst = new LocalLoadInstruction(state, inst, (CilLocalVariable)inst.Operand!);
+                        state.InstructionBuilder.Add(loadInst);
+                        reg = loadInst.TempReg1;
+                    }
+                    if (inst.IsLdarg())
+                    {
+                        // If this fails we're pretty fucked.
+                        var param = (Parameter)inst.Operand!;
+                        var typeName = param.ParameterType.ToTypeDefOrRef().Name;
+                        if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
+                        {
+                            throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
+                        }
+                        var ldargInst = new ParamLoadInstruction(state, param.Index, (DataType)dataType, param, inst);
+                        state.InstructionBuilder.Add(ldargInst);
+                        
+                        // Load the tempreg where the param is existing.
+                        reg = ldargInst.TempReg1;
+
+                    }
+                    
+                    // TODO: Null check? But nah... caller does it.
+                    return reg;
+                }
+                
+            }
+
+            public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
+            {
+                return null!;
+                //expression.Accept(this, state);
+            }
+        }
+
         public byte[] Compile(MethodDefinition method)
         {
+            // TODO: Sort out concurrency issues.
+            // Pass as param for AST visitor?
+            CurrentMethod = method;
 
             var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
             var blocks = BlockBuilder.ConstructBlocks(sfg);
             var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
 
             method.CilMethodBody!.Instructions.ExpandMacros();
-            
-            var walker = new VMAstWalker();
+
+            var visitor = new VMNodeVisitor();
+            visitor.Visit(astCompUnit, this);
+
+            //var walker = new VMAstWalker() { Compiler = this };
             //AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
-
-            var b = blocks.GetAllBlocks().ToList();
-            
-            for (int i = 0; i < b.Count; i++)
-            {
-                ProcessBlock(b, b[i], i, sfg, astCompUnit, method);
-            }
-
-
-            //// We offset the depth by the number of parameters, this way we keep registers separate.
-            //ProcessedDepth = 0;
-
-
-            //for (int instIndex = 0; instIndex < method.CilMethodBody!.Instructions.Count; instIndex++)
-            //{
-            //    CilInstruction inst = method.CilMethodBody!.Instructions[instIndex];
-            //    CilInstruction? prevInst = instIndex > 0 ? method.CilMethodBody!.Instructions[instIndex - 1] : null;
-            //    CilInstruction? nextInst = instIndex + 1 < method.CilMethodBody!.Instructions.Count ? method.CilMethodBody!.Instructions[instIndex + 1] : null;
-
-            //    int push = inst.GetStackPushCount();
-            //    int pop = inst.GetStackPopCount(method.CilMethodBody!);
-            //    Push = push;
-            //    Pop = pop;
-            //    PreviousDepth = ProcessedDepth;
-            //    ProcessedDepth += push - pop;
-            //    if (inst.IsLdloc())
-            //    {
-            //        var localVar = inst.Operand as CilLocalVariable;
-            //        if (localVar != null)
-            //        {
-            //            var reg = RegisterHelper.Registers.FirstOrDefault(x => x.LocalVar == localVar);
-            //            if (reg != null)
-            //            {
-            //                // If we simply update the last offset used to the current offset, hopefully when we later add it magically... works?
-            //                reg.LastOffsetUsed = inst.Offset;
-
-            //                Console.WriteLine($"-> Prev SP: {reg.StackPosition}, Update to {PreviousDepth}");
-            //                reg.StackPosition = PreviousDepth;
-
-            //                Console.WriteLine($"  -> Update SP, LOU for {reg}");
-            //            }
-            //        }
-            //    }
-
-            //    if (inst.IsLdarg())
-            //    {
-            //        // Arguments need to be loaded into registries.
-            //        var param = inst.Operand as Parameter;
-            //        if (param != null)
-            //        {
-            //            var typeName = param.ParameterType.ToTypeDefOrRef().Name;
-            //            if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
-            //            {
-            //                throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
-            //            }
-
-            //            var paramLoad = new ParamLoadInstruction(this, paramCount++, (DataType)dataType, param);
-            //            InstructionBuilder.Add(paramLoad);
-            //        }
-            //    }
-
-            //    if (inst.IsLdcI4() && nextInst != null)
-            //    {
-            //        var valueToLoad = (int)inst.Operand!;
-
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst!.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var numType = DataType.Int32;
-
-            //        var numLoad = new NumLoadInstruction(this, valueToLoad, numType, inst, localVar);
-            //        InstructionBuilder.Add(numLoad);
-
-            //        processed++;
-            //    }
-
-            //    if (inst.OpCode.Code == CilCode.Add)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new AddInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Sub)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new SubInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Mul)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new MulInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Div)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new DivInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Xor)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new XorInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Or)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new OrInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.And)
-            //    {
-            //        // Check if next instruction is storing, and if so, track the variable.
-            //        CilLocalVariable? localVar = null;
-            //        if (nextInst != null && nextInst.IsStloc())
-            //        {
-            //            localVar = (CilLocalVariable?)nextInst.Operand;
-            //        }
-
-            //        var add = new AndInstruction(this, inst, localVar);
-            //        InstructionBuilder.Add(add);
-            //        processed++;
-            //    }
-            //    if (inst.OpCode.Code == CilCode.Ret)
-            //    {
-            //        var ret = new ReturnInstruction(this, method.Signature!.ReturnsValue);
-            //        InstructionBuilder.Add(ret);
-            //        processed++;
-            //    }
-            //}
 
             method.CilMethodBody!.Instructions.OptimizeMacros();
 
             return InstructionBuilder.ToByteArray(true);
-        }
-
-        private void ProcessBlock(List<BasicBlock<CilInstruction>> basicBlocks, BasicBlock<CilInstruction> block, int blockIndex, ControlFlowGraph<CilInstruction> sfg, CompilationUnit<CilInstruction> ast, MethodDefinition method)
-        {
-            var sfgNode = sfg.Nodes.GetByOffset(block.Offset);
-
-            for (int instIndex = 0; instIndex < block.Instructions.Count; instIndex++)
-            {
-                CilInstruction inst = block.Instructions[instIndex];
-                CilInstruction? prevInst = instIndex > 0 ? method.CilMethodBody!.Instructions[instIndex - 1] : null;
-                CilInstruction? nextInst = instIndex + 1 < method.CilMethodBody!.Instructions.Count ? method.CilMethodBody!.Instructions[instIndex + 1] : null;
-
-                int push = inst.GetStackPushCount();
-                int pop = inst.GetStackPopCount(method.CilMethodBody!);
-
-                Push = push;
-                Pop = pop;
-                PreviousDepth = ProcessedDepth;
-                ProcessedDepth += push - pop;
-                if (inst.IsLdcI4())
-                {
-                    var load = new NumLoadInstruction(this, inst.Operand!, DataType.Int32, inst);
-                    InstructionBuilder.Add(load);
-                }
-
-                if (inst.OpCode.Code == CilCode.Add)
-                {
-                    var add = new AddInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-                if (inst.OpCode.Code == CilCode.Sub)
-                {
-                    var add = new SubInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-                if (inst.OpCode.Code == CilCode.Mul)
-                {
-                    var add = new MulInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-                if (inst.OpCode.Code == CilCode.Div)
-                {
-                    var add = new DivInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-                if (inst.OpCode.Code == CilCode.And)
-                {
-                    var add = new AndInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-                if (inst.OpCode.Code == CilCode.Xor)
-                {
-                    var add = new XorInstruction(this, inst);
-                    InstructionBuilder.Add(add);
-                }
-
-                if (inst.IsStloc())
-                {
-                    var cilLocal = (CilLocalVariable)inst.Operand!;
-                    var store = new LocalStoreInstruction(this, inst, cilLocal);
-                    InstructionBuilder.Add(store);
-                }
-
-                if (inst.IsLdloc())
-                {
-                    var cilLocal = (CilLocalVariable)inst.Operand!;
-                    var load = new LocalLoadInstruction(this, inst, cilLocal);
-                    InstructionBuilder.Add(load);
-                }
-
-                if (inst.IsLdarg())
-                {
-                    var param = (Parameter)inst.Operand!;
-                    var typeName = param.ParameterType.ToTypeDefOrRef().Name;
-                    if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
-                    {
-                        throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
-                    }
-                    var p = new ParamLoadInstruction(this, param.Index, (DataType)dataType, param, inst);
-                    InstructionBuilder.Add(p);
-                }
-
-                if (inst.OpCode.Code == CilCode.Ret)
-                {
-                    var ret = new ReturnInstruction(this, method.Signature!.ReturnsValue);
-                    InstructionBuilder.Add(ret);
-                }
-                //if (inst.IsLdloc())
-                //{
-                //    var localVar = inst.Operand as CilLocalVariable;
-                //    if (localVar != null)
-                //    {
-                //        var reg = RegisterHelper.Registers.FirstOrDefault(x => x.LocalVar == localVar);
-                //        if (reg != null)
-                //        {
-                //            // If we simply update the last offset used to the current offset, hopefully when we later add it magically... works?
-                //            reg.LastOffsetUsed = inst.Offset;
-
-                //            Console.WriteLine($"-> Prev SP: {reg.StackPosition}, Update to {PreviousDepth}");
-                //            reg.StackPosition = PreviousDepth;
-
-                //            Console.WriteLine($"  -> Update SP, LOU for {reg}");
-                //        }
-                //    }
-                //}
-
-
-
-            }
         }
     }
 }
