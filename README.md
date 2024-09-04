@@ -32,7 +32,11 @@ This is very basic for now.
 - PARAM `<data-type> <param-index>`
 - STORE `<reg-from> <reg-to>`
 - LOAD `<reg-from> <reg-to>` (this is actually just store again!)
+- COMPARE `<reg-to-save-to> <comparator-type> <reg-left-compare> <reg-right-compare>`
 - RET `<register>`
+
+## Control Flow
+- JUMP_BOOL `<offset-to-jump-to> <should-invert> <reg-to-check-for-boolean>` (for all branches)
 
 ## Maths
 - ADD `<data-type> <register-to-save-to> <register-1> <register-2>`
