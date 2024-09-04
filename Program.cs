@@ -76,14 +76,14 @@ namespace RegiVM
                 {
                     goto a;
                 }
-            //if (d == 34)
-            //{
-            //    d = 600;
-            //}
-            //else
-            //{
-            //    d = 500;
-            //}
+            if (d != 34)
+            {
+                d = 600;
+            }
+            else
+            {
+                d = 500;
+            }
             return d;
         }
     }

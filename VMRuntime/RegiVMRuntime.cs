@@ -175,20 +175,33 @@ namespace RegiVM.VMRuntime
             //if (leftDataType != rightDataType)
             //{
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
-                dynamic leftObjD = leftObj;
-                dynamic rightObjD = rightObj;
-                bool result = cType switch
+            var leftObj = GetNumberObject(leftDataType, left);
+            var rightObj = GetNumberObject(rightDataType, right);
+            dynamic leftObjD = leftObj;
+            dynamic rightObjD = rightObj;
+
+            // If one side is boolean but not both...
+            if (leftDataType != rightDataType && (leftDataType == DataType.Boolean || rightDataType == DataType.Boolean))
+            {
+                if (leftDataType == DataType.Boolean)
                 {
-                    ComparatorType.IsEqual => leftObjD == rightObjD,
-                    ComparatorType.IsNotEqual => leftObjD != rightObjD,
-                    ComparatorType.IsGreaterThan => leftObjD > rightObjD,
-                    ComparatorType.IsGreaterThanOrEqual => leftObjD >= rightObjD,
-                    ComparatorType.IsLessThan => leftObjD < rightObjD,
-                    ComparatorType.IsLessThanOrEqual => leftObjD <= rightObjD,
-                };
-                return [(byte)(result ? 1 : 0)];
+                    leftObjD = leftObjD ? 1 : 0;
+                }
+                else if (rightDataType == DataType.Boolean) 
+                {
+                    rightObjD = rightObjD ? 1 : 0;
+                }
+            }
+            bool result = cType switch
+            {
+                ComparatorType.IsEqual => leftObjD == rightObjD,
+                ComparatorType.IsNotEqual => leftObjD != rightObjD,
+                ComparatorType.IsGreaterThan => leftObjD > rightObjD,
+                ComparatorType.IsGreaterThanOrEqual => leftObjD >= rightObjD,
+                ComparatorType.IsLessThan => leftObjD < rightObjD,
+                ComparatorType.IsLessThanOrEqual => leftObjD <= rightObjD,
+            };
+            return [(byte)(result ? 1 : 0)];
             //}
             
             // TODO: Figure out a way that is independent of switch statements... Anon method? ILProcessor?
