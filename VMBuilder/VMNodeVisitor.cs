@@ -291,6 +291,8 @@ namespace RegiVM.VMBuilder
                         }
 
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+                        state.InstructionBuilder.AddUsedMapping(position);
+
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
 
@@ -364,6 +366,9 @@ namespace RegiVM.VMBuilder
                         }
                         
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+                        // Always add as used mapping.
+                        state.InstructionBuilder.AddUsedMapping(position);
+
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
 

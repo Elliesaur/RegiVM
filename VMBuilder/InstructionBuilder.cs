@@ -16,7 +16,8 @@ namespace RegiVM.VMBuilder
     {
         private readonly List<VMInstruction> _instructions = new List<VMInstruction>();
         private readonly List<Tuple<CilInstruction, ulong>> _realInstructions = new List<Tuple<CilInstruction, ulong>>();
-        public Dictionary<int, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<int, Tuple<int, int>>();
+        private readonly Dictionary<int, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<int, Tuple<int, int>>();
+        private readonly List<int> _usedInstructionIndexes = new List<int>();
 
         public InstructionBuilder()
         {
@@ -40,7 +41,13 @@ namespace RegiVM.VMBuilder
 
         public int InstructionToOffset(CilInstruction realInstruction)
         {
-            return _realInstructions.IndexOf(_realInstructions.FirstOrDefault(x => x.Item1 == realInstruction)!);
+            var index = _realInstructions.IndexOf(_realInstructions.FirstOrDefault(x => x.Item1 == realInstruction)!);
+            return index;
+        }
+
+        public void AddUsedMapping(int instructionIndex)
+        {
+            _usedInstructionIndexes.Add(instructionIndex);
         }
 
         public byte[] ToByteArray(bool performCompression)
@@ -48,13 +55,15 @@ namespace RegiVM.VMBuilder
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
-                writer.Write(_instructionOffsetMappings.Count);    
-                // Write mapping data.
-                foreach (var mappingItem in _instructionOffsetMappings)
+                // Only write used mapping data, that way we do not reveal a whole lot about our internal workings.
+                writer.Write(_usedInstructionIndexes.Count);
+                // We shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
+                foreach (var instIndex in _usedInstructionIndexes.Shuffle())
                 {
-                    writer.Write(mappingItem.Key);
-                    writer.Write(mappingItem.Value.Item1);
-                    writer.Write(mappingItem.Value.Item2);
+                    var mappingItem = _instructionOffsetMappings[instIndex];
+                    writer.Write(instIndex);
+                    writer.Write(mappingItem.Item1);
+                    writer.Write(mappingItem.Item2);
                 }
                 // Write instruction data.
                 foreach (var instruction in _instructions)
