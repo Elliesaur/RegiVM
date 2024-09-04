@@ -21,7 +21,8 @@ namespace RegiVM.VMBuilder
         public ulong And { get; set; } = 0x9000UL;
         public ulong Or { get; set; } = 0x10000UL;
         public ulong LocalLoadStore { get; set; } = 0x11000UL;
-        public ulong LocalLoad { get; set; } = 0x12000UL;
+        public ulong JumpBool { get; set; } = 0x12000UL;
+        public ulong Comparator { get; set; } = 0x13000UL;
 
         public void RandomizeAll()
         {

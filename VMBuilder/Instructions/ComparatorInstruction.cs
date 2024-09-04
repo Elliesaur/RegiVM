@@ -1,48 +1,58 @@
-﻿using AsmResolver.DotNet.Code.Cil;
-using AsmResolver.PE.DotNet.Cil;
+﻿using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Registers;
 
 namespace RegiVM.VMBuilder.Instructions
 {
-    public class AddInstruction : VMInstruction
+    public enum ComparatorType : byte
+    {
+        IsEqual = 0x1,
+        IsNotEqual = 0x2,
+        IsGreaterThan = 0x3,
+        IsLessThan = 0x4,
+        IsGreaterThanOrEqual = 0x5,
+        IsLessThanOrEqual = 0x6
+    }
+    public class ComparatorInstruction : VMInstruction
     {
         public override ulong OpCode { get; }
         public CilInstruction Inst { get; }
         public VMRegister Reg1 { get; }
         public VMRegister Reg2 { get; }
         public VMRegister ToPushReg { get; }
+        public ComparatorType CompType { get; }
         public override byte[] ByteCode { get; }
 
-        public AddInstruction(VMCompiler compiler, CilInstruction inst)
+        public ComparatorInstruction(VMCompiler compiler, CilInstruction inst, ComparatorType compType)
         {
             Registers = compiler.RegisterHelper;
+            CompType = compType;
+
             // Get last two registers.
             var rawReg2 = Registers.Temporary.Pop();
             var rawReg1 = Registers.Temporary.Pop();
             Reg1 = new VMRegister(rawReg1);
             Reg2 = new VMRegister(rawReg2);
 
-            //Registers.Reset([rawReg1, rawReg2]);
 
             ToPushReg = Registers.ForTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
-            ToPushReg.DataType = Reg1.DataType;
+            ToPushReg.DataType = DataType.Boolean;
 
             Inst = inst;
-            OpCode = compiler.OpCodes.Add;
+            OpCode = compiler.OpCodes.Comparator;
 
             ByteCode = ToByteArray();
         }
 
         public override byte[] ToByteArray()
         {
-            Console.WriteLine($"ADD {ToPushReg.DataType}={Reg1.DataType}+{Reg2.DataType} {ToPushReg} {Reg1} {Reg2}");
+            Console.WriteLine($"COMPARE {ToPushReg} {Reg1} ({CompType}) {Reg2}");
 
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
-                writer.Write((byte)ToPushReg.DataType);
+                writer.Write((byte)CompType);
                 writer.Write((byte)Reg1.DataType);
                 writer.Write((byte)Reg2.DataType);
 
@@ -59,5 +69,4 @@ namespace RegiVM.VMBuilder.Instructions
             }
         }
     }
-
 }

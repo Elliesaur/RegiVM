@@ -5,6 +5,7 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using RegiVM.VMBuilder;
+using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -64,6 +65,27 @@ namespace RegiVM
             
             return d + c;
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static int Math5(int arg1, int arg2)
+        {
+            a:
+                int d = arg1;
+                d = d - arg2;
+                if (d == 0)
+                {
+                    goto a;
+                }
+            //if (d == 34)
+            //{
+            //    d = 600;
+            //}
+            //else
+            //{
+            //    d = 500;
+            //}
+            return d;
+        }
     }
 
     public class Program
@@ -73,7 +95,7 @@ namespace RegiVM
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Math3");
+            var testMd = testType.Methods.First(x => x.Name == "Math5");
             //var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
             //testMd.CilMethodBody = new CilMethodBody(testMd);
             //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
@@ -109,6 +131,8 @@ namespace RegiVM
                 tracker += registerLength;
 
                 byte[] value = d.Skip(tracker).Take(numByteToReadForValue).ToArray();
+                tracker += numByteToReadForValue;
+
                 ByteArrayKey regKey = new ByteArrayKey(register);
 
                 if (!h.ContainsKey(regKey))
@@ -119,6 +143,7 @@ namespace RegiVM
                 {
                     h[regKey] = value;
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.ParameterLoad, (t, h, d, p) =>
             {
@@ -133,6 +158,8 @@ namespace RegiVM
                 byte[] endResult = t.ConvertParameter(paramDataType, paramData);
 
                 ByteArrayKey regName = new ByteArrayKey(d.Skip(tracker).ToArray());
+                tracker += regName.Bytes.Length;
+
                 if (!h.ContainsKey(regName))
                 {
                     h.Add(regName, endResult);
@@ -141,6 +168,7 @@ namespace RegiVM
                 {
                     h[regName] = endResult;
                 }
+                return tracker;
             });
             // Yes, technically and definitely the maths opcodes can all be one fucking OPCODE OKAY
             // BUT I CANT BE FUCKED RIGHT NOW OK >:C
@@ -171,6 +199,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Sub, (t, h, d, _) =>
             {
@@ -199,6 +228,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Mul, (t, h, d, _) =>
             {
@@ -227,6 +257,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Div, (t, h, d, _) =>
             {
@@ -255,6 +286,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Xor, (t, h, d, _) =>
             {
@@ -283,6 +315,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Or, (t, h, d, _) =>
             {
@@ -311,6 +344,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.And, (t, h, d, _) =>
             {
@@ -339,6 +373,7 @@ namespace RegiVM
                 {
                     h[result] = endResult.ToArray();
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Ret, (t, h, d, _) =>
             {
@@ -352,6 +387,7 @@ namespace RegiVM
                     ByteArrayKey result = new ByteArrayKey(retValueReg);
                     t.RETURN_REGISTER = result;
                 }
+                return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.LocalLoadStore, (t, h, d, _) =>
             {
@@ -372,9 +408,69 @@ namespace RegiVM
                 {
                     h[toReg] = valueFrom;
                 }
+                return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.JumpBool, (t, h, d, _) =>
+            {
+                int tracker = 0;
+                // OFFSET?
+                int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                tracker += 4;
+                
+                bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
+
+                byte[] shouldSkipTrackerRegName = d.Skip(tracker).ToArray();
+                tracker += shouldSkipTrackerRegName.Length;
+
+                ByteArrayKey shouldBranchReg = new ByteArrayKey(shouldSkipTrackerRegName);
+
+                // Should this branch happen?
+                bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
+
+                if (!shouldInvert && shouldBranch)
+                {
+                    // Lol, just set the tracker to the god damn thing.
+                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                } 
+                else if (shouldInvert && !shouldBranch)
+                {
+                    // Lol, just set the tracker to the god damn thing.
+                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                }
+                return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, (t, h, d, _) =>
+            {
+                // CEQ/CLT/CGT 
+                int tracker = 0;
+
+                ComparatorType compareType = t.ReadComparatorType(d, ref tracker);
+                DataType pop1DataType = t.ReadDataType(d, ref tracker);
+                DataType pop2DataType = t.ReadDataType(d, ref tracker);
+
+                byte[] push1 = t.ReadBytes(d, ref tracker, out int push1Length);
+                byte[] pop1 = t.ReadBytes(d, ref tracker, out int pop1Length);
+                byte[] pop2 = t.ReadBytes(d, ref tracker, out int pop2Length);
+
+                byte[] val1 = h[new ByteArrayKey(pop1)];
+                byte[] val2 = h[new ByteArrayKey(pop2)];
+
+                byte[] endResult = t.PerformComparison(compareType, pop1DataType, pop2DataType, val1, val2);
+
+                ByteArrayKey result = new ByteArrayKey(push1);
+                if (!h.ContainsKey(result))
+                {
+                    h.Add(result, endResult);
+                }
+                else
+                {
+                    h[result] = endResult.ToArray();
+                }
+                return tracker;
             });
 
-            var actualResult = TestProgram.Math3(50, 60);
+
+            var actualResult = TestProgram.Math5(50, 60);
             Console.WriteLine(actualResult);
 
             vm.Run();

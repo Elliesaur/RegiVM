@@ -23,8 +23,16 @@ namespace RegiVM.VMBuilder.Instructions
             TempReg1 = Registers.ForTemp();
             TempReg1.DataType = NumType;
 
-            var valueAsByte = BitConverter.GetBytes((dynamic)ValueToLoad);
-            TempReg1.CurrentData = valueAsByte;
+            if (numType == DataType.Boolean)
+            {
+                TempReg1.CurrentData = new byte[] { (byte)((bool)valueToLoad ? 1 : 0) };
+            }
+            else
+            {
+                var valueAsByte = BitConverter.GetBytes((dynamic)ValueToLoad);
+                TempReg1.CurrentData = valueAsByte;
+            }
+            
             TempReg1.LastOffsetUsed = Inst.Offset;
             TempReg1.OriginalOffset = Inst.Offset;
 

@@ -1,4 +1,5 @@
 ﻿using RegiVM.VMBuilder;
+using RegiVM.VMBuilder.Instructions;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
@@ -7,7 +8,7 @@ namespace RegiVM.VMRuntime
 {
     internal class RegiVMRuntime
     {
-        private ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
+        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
 
         internal ByteArrayKey RETURN_REGISTER;
@@ -15,9 +16,14 @@ namespace RegiVM.VMRuntime
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
 
-        public Dictionary<ulong, Action<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>>> OpCodeHandlers { get; } = new Dictionary<ulong, Action<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>>>();
+        public Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>> OpCodeHandlers { get; } = new Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>>();
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
+
+        // Track instruction offset mappings for branch statements.
+        // Item1 = start offset (IP).
+        // Item2 = end offset (IP end after tracking).
+        public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -33,13 +39,44 @@ namespace RegiVM.VMRuntime
                 {
                     gzipStream.CopyTo(uncompressedStream);
                 }
-                Heap.Add(DATA, uncompressedStream.ToArray());
+                // Reuse arg.
+                data = uncompressedStream.ToArray();
+                var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
+                var track = 4;
+                for (var i = 0; i < mappingLength; i++)
+                {
+                    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
+                    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
+                    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
+                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                }
+                Heap.Add(DATA, data.Skip(track).ToArray());
             }
             else
             {
-                Heap.Add(DATA, data);
-            }
+                var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
+                var track = 4;
+                for (var i = 0; i < mappingLength; i++) 
+                {
+                    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
 
+                    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
+                    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+                    
+                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                }
+                Heap.Add(DATA, data.Skip(track).ToArray());
+            }
             for (int i = 0; i < parameters.Length; i++)
             {
                 Parameters.Add(i, parameters[i]);
@@ -56,9 +93,19 @@ namespace RegiVM.VMRuntime
             ip += 4;
 
             byte[] operandValue = Heap[DATA].Skip(ip).Take(operandLength).ToArray();
-            ip += operandLength;
+            // TODO: This works great... If any issues, use this.
+            //ip += operandLength;
 
-            OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
+            var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
+            // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
+            if (track != operandLength)
+            {
+                ip = track;
+            }
+            else
+            {
+                ip += track;
+            }
         }
 
         internal void Run()
@@ -80,7 +127,7 @@ namespace RegiVM.VMRuntime
         {
             return numType switch
             {
-                DataType.Int8 or DataType.UInt8 => 1,
+                DataType.Int8 or DataType.UInt8 or DataType.Boolean => 1,
                 DataType.Int16 or DataType.UInt16 => 2,
                 DataType.Int32 or DataType.UInt32 or DataType.Single => 4,
                 DataType.Int64 or DataType.UInt64 or DataType.Double => 8,
@@ -110,7 +157,10 @@ namespace RegiVM.VMRuntime
         {
             return (DataType)data[tracker++];
         }
-
+        internal ComparatorType ReadComparatorType(byte[] data, ref int tracker)
+        {
+            return (ComparatorType)data[tracker++];
+        }
         internal byte[] ReadBytes(byte[] data, ref int tracker, out int length)
         {
             length = BitConverter.ToInt32(data.Skip(tracker).Take(4).ToArray());
@@ -118,6 +168,46 @@ namespace RegiVM.VMRuntime
             var res = data.Skip(tracker).Take(length).ToArray();
             tracker += length;
             return res;
+        }
+
+        internal byte[] PerformComparison(ComparatorType cType, DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
+        {
+            //if (leftDataType != rightDataType)
+            //{
+                // We cannot determine and should not determine the crazy amounts of options.
+                var leftObj = GetNumberObject(leftDataType, left);
+                var rightObj = GetNumberObject(rightDataType, right);
+                dynamic leftObjD = leftObj;
+                dynamic rightObjD = rightObj;
+                bool result = cType switch
+                {
+                    ComparatorType.IsEqual => leftObjD == rightObjD,
+                    ComparatorType.IsNotEqual => leftObjD != rightObjD,
+                    ComparatorType.IsGreaterThan => leftObjD > rightObjD,
+                    ComparatorType.IsGreaterThanOrEqual => leftObjD >= rightObjD,
+                    ComparatorType.IsLessThan => leftObjD < rightObjD,
+                    ComparatorType.IsLessThanOrEqual => leftObjD <= rightObjD,
+                };
+                return [(byte)(result ? 1 : 0)];
+            //}
+            
+            // TODO: Figure out a way that is independent of switch statements... Anon method? ILProcessor?
+            
+            //bool result = leftDataType switch
+            //{
+            //    DataType.Int32 => BitConverter.GetBytes(BitConverter.ToInt32(left) + BitConverter.ToInt32(right)),
+            //    DataType.UInt32 => BitConverter.GetBytes(BitConverter.ToUInt32(left) + BitConverter.ToUInt32(right)),
+            //    DataType.Int64 => BitConverter.GetBytes(BitConverter.ToInt64(left) + BitConverter.ToInt64(right)),
+            //    DataType.UInt64 => BitConverter.GetBytes(BitConverter.ToUInt64(left) + BitConverter.ToUInt64(right)),
+            //    DataType.Int8 => BitConverter.GetBytes((sbyte)left[0] + (sbyte)right[0]), // Assuming sbyte for Int8
+            //    DataType.UInt8 => BitConverter.GetBytes(left[0] + right[0]),
+            //    DataType.Int16 => BitConverter.GetBytes(BitConverter.ToInt16(left) + BitConverter.ToInt16(right)),
+            //    DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) + BitConverter.ToUInt16(right)),
+            //    DataType.Single => BitConverter.GetBytes(BitConverter.ToSingle(left) + BitConverter.ToSingle(right)),
+            //    DataType.Double => BitConverter.GetBytes(BitConverter.ToDouble(left) + BitConverter.ToDouble(right)),
+            //    //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
+            //};
+            //return [(byte)(result ? 1 : 0)];
         }
 
         internal byte[] PerformAddition(DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
@@ -323,7 +413,8 @@ namespace RegiVM.VMRuntime
                 DataType.Int16 => BitConverter.ToInt16(val),
                 DataType.UInt16 => BitConverter.ToUInt16(val),
                 DataType.Single => BitConverter.ToSingle(val),
-                DataType.Double => BitConverter.ToDouble(val)
+                DataType.Double => BitConverter.ToDouble(val),
+                DataType.Boolean => (bool)(val[0] == 1 ? true : false)
                 //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
