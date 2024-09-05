@@ -57,6 +57,9 @@ namespace RegiVM.VMBuilder
         public int ProcessedDepth { get; set; }
         public int Pop { get; set; }
         public int Push { get; set; }
+        public ScopeBlock<CilInstruction> MethodBlocks { get; private set; }
+        public ControlFlowGraph<CilInstruction> MethodStaticFlowGraph { get; private set; }
+        public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
 
         public VMCompiler()
         {
@@ -95,7 +98,11 @@ namespace RegiVM.VMBuilder
             CurrentMethod = method;
 
             var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
-            var blocks = BlockBuilder.ConstructBlocks(sfg);
+            
+            MethodBlocks = BlockBuilder.ConstructBlocks(sfg);
+            MethodStaticFlowGraph = sfg;
+            MethodDataFlowGraph = dfg;
+
             var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
 
             method.CilMethodBody!.Instructions.ExpandMacros();

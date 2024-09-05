@@ -57,8 +57,9 @@ namespace RegiVM.VMBuilder
             {
                 // Only write used mapping data, that way we do not reveal a whole lot about our internal workings.
                 writer.Write(_usedInstructionIndexes.Count);
-                // We shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
-                foreach (var instIndex in _usedInstructionIndexes.Shuffle())
+                // We make sure it is unique.
+                // We then shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
+                foreach (var instIndex in _usedInstructionIndexes.Distinct().Shuffle())
                 {
                     var mappingItem = _instructionOffsetMappings[instIndex];
                     writer.Write(instIndex);

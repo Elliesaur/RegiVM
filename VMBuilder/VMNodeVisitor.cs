@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
+using Echo.ControlFlow.Regions;
 using Microsoft.Win32;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
@@ -35,18 +36,35 @@ namespace RegiVM.VMBuilder
                 }
             }
 
-            // TODO: Populate.
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
+                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, null);
+                foreach (var s in statement.ProtectedBlock.Statements)
+                {
+                     s.Accept(this, state);
+                }
+                state.InstructionBuilder.AddDryPass(state.OpCodes.EndBlock, null);
+                foreach (var s in statement.Handlers)
+                {
+                    s.Accept(this, state);
+                }
             }
 
             public void Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
             {
+                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, null);
+                foreach (var s in clause.Contents.Statements)
+                {
+                    s.Accept(this, state);
+                }
+                state.InstructionBuilder.AddDryPass(state.OpCodes.EndBlock, null);
             }
 
             public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
             {
+                state.InstructionBuilder.AddDryPass(state.OpCodes.LoadPhi, null);
             }
+
             public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
             {
             }
@@ -168,11 +186,9 @@ namespace RegiVM.VMBuilder
                 // A phi statement is used when it isn't quite clear what the value will be.
                 // This often happens in a catch statement when the first instruction will be "stloc".
                 // The AST has no idea how to handle the stack because technically something is pushed to the stack in runtime!!
-                
-                // TODO: ADD INSTRUCTION FOR PHI: "LOAD_EXCEPTION" or something...
-                var reg = state.RegisterHelper.ForTemp();
-                Console.WriteLine($"PHI {reg} {statement}");
-                return reg;
+                var phiInst = new LoadPhiInstruction(state);
+                state.InstructionBuilder.Add(phiInst);
+                return phiInst.TempReg1;
             }
 
             public VMRegister Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
@@ -190,22 +206,25 @@ namespace RegiVM.VMBuilder
                 List<VMRegister> registers = new List<VMRegister>();
 
                 // Visit all statements in the protected block.
-                Console.WriteLine("ENTER PROTECTED BLOCK");
+                var startBlockInst = new StartBlockInstruction(state, VMBlockType.Protected);
+                state.InstructionBuilder.Add(startBlockInst);
+
                 foreach (var s in statement.ProtectedBlock.Statements)
                 {
                     var rFromInner = s.Accept(this, state);
                     if (rFromInner != null)
                         registers.Add(rFromInner);
                 }
-                Console.WriteLine("EXIT PROTECTED BLOCK");
+
+                var endBlockInst = new EndBlockInstruction(state, VMBlockType.Protected);
+                state.InstructionBuilder.Add(endBlockInst);
+
                 // Then visit all statements in the handlers for the exception block.
                 foreach (var s in statement.Handlers)
                 {
-                    Console.WriteLine("START HANDLER");
                     var rFromInner = s.Accept(this, state);
                     if (rFromInner != null)
                         registers.Add(rFromInner);
-                    Console.WriteLine("END HANDLER");
                 }
 
                 return null!;
@@ -215,12 +234,21 @@ namespace RegiVM.VMBuilder
             {
                 List<VMRegister> registers = new List<VMRegister>();
 
+                CilExceptionHandler? handlerInfo = clause.Tag as CilExceptionHandler;
+
+                var startBlockInst = new StartBlockInstruction(state, handlerInfo!.HandlerType.ToVMBlockHandlerType());
+                state.InstructionBuilder.Add(startBlockInst);
+
                 foreach (var s in clause.Contents.Statements)
                 {
                     var rFromInner = s.Accept(this, state);
                     if (rFromInner != null)
                         registers.Add(rFromInner);
                 }
+
+                var endBlockInst = new EndBlockInstruction(state, handlerInfo!.HandlerType.ToVMBlockHandlerType());
+                state.InstructionBuilder.Add(endBlockInst);
+
                 return null!;
             }
 
