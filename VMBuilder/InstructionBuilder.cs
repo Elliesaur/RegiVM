@@ -113,6 +113,7 @@ namespace RegiVM.VMBuilder
                 case CilCode.Stloc:
                 case CilCode.Starg:
                 case CilCode.Ceq:
+                case CilCode.Leave:
                     return true;
 
                 default:

@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
+using Microsoft.Win32;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
 
@@ -25,10 +26,7 @@ namespace RegiVM.VMBuilder
                 statement.Expression.Accept(this, state);
             }
 
-            public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
-            {
-            }
-
+            
             public void Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
             {
                 foreach (var s in statement.Statements)
@@ -37,6 +35,7 @@ namespace RegiVM.VMBuilder
                 }
             }
 
+            // TODO: Populate.
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
             }
@@ -45,6 +44,12 @@ namespace RegiVM.VMBuilder
             {
             }
 
+            public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
+            {
+            }
+            public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
+            {
+            }
             public void Visit(InstructionExpression<CilInstruction> expression, VMCompiler state)
             {
                 if (expression.Arguments.Count > 0)
@@ -135,9 +140,7 @@ namespace RegiVM.VMBuilder
                 }
 
             }
-            public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
-            {
-            }
+            
         }
 
         public class VMNodeVisitor : IAstNodeVisitor<CilInstruction, VMCompiler, VMRegister>
@@ -161,7 +164,15 @@ namespace RegiVM.VMBuilder
 
             public VMRegister Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
             {
-                return null!;
+                // We have to push something, otherwise things will break!
+                // A phi statement is used when it isn't quite clear what the value will be.
+                // This often happens in a catch statement when the first instruction will be "stloc".
+                // The AST has no idea how to handle the stack because technically something is pushed to the stack in runtime!!
+                
+                // TODO: ADD INSTRUCTION FOR PHI: "LOAD_EXCEPTION" or something...
+                var reg = state.RegisterHelper.ForTemp();
+                Console.WriteLine($"PHI {reg} {statement}");
+                return reg;
             }
 
             public VMRegister Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
@@ -176,12 +187,47 @@ namespace RegiVM.VMBuilder
 
             public VMRegister Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
+                List<VMRegister> registers = new List<VMRegister>();
+
+                // Visit all statements in the protected block.
+                Console.WriteLine("ENTER PROTECTED BLOCK");
+                foreach (var s in statement.ProtectedBlock.Statements)
+                {
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                }
+                Console.WriteLine("EXIT PROTECTED BLOCK");
+                // Then visit all statements in the handlers for the exception block.
+                foreach (var s in statement.Handlers)
+                {
+                    Console.WriteLine("START HANDLER");
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                    Console.WriteLine("END HANDLER");
+                }
+
                 return null!;
             }
 
             public VMRegister Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
             {
+                List<VMRegister> registers = new List<VMRegister>();
+
+                foreach (var s in clause.Contents.Statements)
+                {
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                }
                 return null!;
+            }
+
+            public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
+            {
+                return null!;
+                //expression.Accept(this, state);
             }
 
             public VMRegister Visit(InstructionExpression<CilInstruction> expression, VMCompiler state)
@@ -381,11 +427,6 @@ namespace RegiVM.VMBuilder
                 
             }
 
-            public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
-            {
-                return null!;
-                //expression.Accept(this, state);
-            }
         }
     }
 }

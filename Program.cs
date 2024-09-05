@@ -1,15 +1,8 @@
 ﻿using AsmResolver.DotNet;
-using AsmResolver.DotNet.Code.Cil;
-using AsmResolver.DotNet.Collections;
-using AsmResolver.DotNet.Signatures;
-using AsmResolver.PE.DotNet.Cil;
-using AsmResolver.PE.DotNet.Metadata.Tables;
 using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
 using static RegiVM.VMRuntime.RegiVMRuntime;
 
 namespace RegiVM
@@ -84,6 +77,19 @@ namespace RegiVM
             {
                 d = 500;
             }
+            try
+            {
+                d = d / 0;
+                d = d + 5;
+            }
+            catch (Exception e)
+            {
+                d = d / 1;
+            }
+            finally
+            {
+                d = d + 100;
+            }
             return d;
         }
     }
@@ -109,8 +115,8 @@ namespace RegiVM
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .RegisterLimit(30)
-                .RandomizeRegisterNames();
+                .RegisterLimit(30);
+                //.RandomizeRegisterNames();
             byte[] data = compiler.Compile(testMd);
 
             Console.WriteLine($"Sizeof Data {data.Length} bytes");

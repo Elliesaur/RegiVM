@@ -8,9 +8,9 @@ namespace RegiVM.VMRuntime
 {
     internal class RegiVMRuntime
     {
-        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
 
+        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         internal ByteArrayKey RETURN_REGISTER;
 
         // A heap which contains a list of bytes, the key is the register.

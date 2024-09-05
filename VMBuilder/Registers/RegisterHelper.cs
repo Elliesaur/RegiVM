@@ -29,7 +29,6 @@ namespace RegiVM.VMBuilder.Registers
 
         public VMRegister ForPush(int depth, int push, int pop)
         {
-            Console.WriteLine($"PUSH - Depth: {depth}");
             // Get a free register, instead of relying on depth being the index of the register to use.
             var reg = GetFree();
             reg.StackPosition = depth;
@@ -39,14 +38,13 @@ namespace RegiVM.VMBuilder.Registers
         // TODO: Bad Ellie, bad! REMOVE!
         private VMRegister ForPop(int depth, int push, int pop)
         {
-            Console.WriteLine($"POP - Depth: {depth}");
             var reg = Registers.Reverse<VMRegister>().First(x => x.StackPosition == depth);
             return reg;
         }
 
         public VMRegister ForTemp()
         {
-            var reg = new VMRegister(IsRandomNames ? $"{Guid.NewGuid().ToString()}" : $"Temp_{_numTempTotalLife++}", RegisterType.Temporary);
+            var reg = new VMRegister(IsRandomNames ? $"{Guid.NewGuid().ToString()}" : $"T{_numTempTotalLife++}", RegisterType.Temporary);
             Temporary.Push(reg);
             return reg;
         }
