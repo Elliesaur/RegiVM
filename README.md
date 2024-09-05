@@ -11,6 +11,16 @@
 - Step through each OpCode, send to handler for that OpCode.
 - Any reference to a register is loaded from the heap. 
 
+## Example Output
+### Original (Debug Mode IL Code):
+![image](https://github.com/user-attachments/assets/60010b62-6cc4-442f-99d6-d3e9ce1ebf37)
+
+### Compiled RegiVM:
+![VsDebugConsole_z6IJU08MBJ](https://github.com/user-attachments/assets/a1249f2c-3513-4497-9cd9-3d38fab1c7d9)
+- This shows the OpCode and the Operand values. 
+- R is a register and T is a temporary register.
+
+
 ## But how does it make my closed-source obfuscator better?
 - It does not.
 - This is a small project which is only just starting. 
