@@ -89,8 +89,6 @@ namespace RegiVM.VMBuilder
             return this;
         }
 
-        
-
         public byte[] Compile(MethodDefinition method)
         {
             // TODO: Sort out concurrency issues.

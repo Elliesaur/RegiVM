@@ -19,6 +19,8 @@ namespace RegiVM.VMBuilder
         private readonly Dictionary<int, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<int, Tuple<int, int>>();
         private readonly List<int> _usedInstructionIndexes = new List<int>();
 
+        // TODO: Store another dictionary that contains block to handler mapping. 
+
         public InstructionBuilder()
         {
         }
@@ -56,7 +58,7 @@ namespace RegiVM.VMBuilder
             using (var writer = new BinaryWriter(memStream))
             {
                 // Only write used mapping data, that way we do not reveal a whole lot about our internal workings.
-                writer.Write(_usedInstructionIndexes.Count);
+                writer.Write(_usedInstructionIndexes.Distinct().Count());
                 // We make sure it is unique.
                 // We then shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
                 foreach (var instIndex in _usedInstructionIndexes.Distinct().Shuffle())
@@ -115,6 +117,9 @@ namespace RegiVM.VMBuilder
                 case CilCode.Starg:
                 case CilCode.Ceq:
                 case CilCode.Leave:
+
+                // Prefix 7 is used to know when a "startblock" occurs.
+                case CilCode.Prefix7:
                     return true;
 
                 default:

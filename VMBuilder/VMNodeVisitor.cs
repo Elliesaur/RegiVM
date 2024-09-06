@@ -6,6 +6,7 @@ using Echo.ControlFlow.Regions;
 using Microsoft.Win32;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
+using System.Reflection.Emit;
 
 namespace RegiVM.VMBuilder
 {
@@ -38,12 +39,11 @@ namespace RegiVM.VMBuilder
 
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
-                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, null);
+                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, new CilInstruction(CilOpCodes.Prefix7));
                 foreach (var s in statement.ProtectedBlock.Statements)
                 {
                      s.Accept(this, state);
                 }
-                state.InstructionBuilder.AddDryPass(state.OpCodes.EndBlock, null);
                 foreach (var s in statement.Handlers)
                 {
                     s.Accept(this, state);
@@ -52,12 +52,10 @@ namespace RegiVM.VMBuilder
 
             public void Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
             {
-                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, null);
                 foreach (var s in clause.Contents.Statements)
                 {
                     s.Accept(this, state);
                 }
-                state.InstructionBuilder.AddDryPass(state.OpCodes.EndBlock, null);
             }
 
             public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
@@ -205,8 +203,31 @@ namespace RegiVM.VMBuilder
             {
                 List<VMRegister> registers = new List<VMRegister>();
 
+                // TODO: When I start a block
+                // - OpCode START_BLOCK
+                // - Operand:
+                //    For each handler:
+                //     - type
+                //     - offset start,
+                //     - offset end,
+                //     - catch class type (check for is assignable from)
+                // Keep a stack of what protected block we are in and what handlers are associated with the current block.
+                // If an exception occurs, foreach the catch exception handlers and if assignable type of exception
+                //  simply set the IP to the offset start associated with the handler
+                //  if we leave the handler (leave inst), we make sure to pop the current protected block and the associated handlers.
+                //  whenever we leave, we must also check if the finally has been run, if not, run the finally.
+                //  if in the finally, the last instruction is "endfinally" which indicates the end of the finally and restore
+                //  back to the original position after the instruction.
+
+                // Old thoughts:
+                // That way, when the runtime sees a start of a block, it notes the handlers for the current block it is in.
+                // Runtime: Use a stack to note the starting blocks. Pop from the stack when the end block appears/when the leave occurs.
+                // When you pop, simply visit the appropriate handlers, or when the "leave" instruction happens, action the handlers.
+                // When an exception occurs, visit the appropriate handler (if any).
+
+
                 // Visit all statements in the protected block.
-                var startBlockInst = new StartBlockInstruction(state, VMBlockType.Protected);
+                var startBlockInst = new StartBlockInstruction(state, statement.Handlers, VMBlockType.Protected);
                 state.InstructionBuilder.Add(startBlockInst);
 
                 foreach (var s in statement.ProtectedBlock.Statements)
@@ -215,9 +236,6 @@ namespace RegiVM.VMBuilder
                     if (rFromInner != null)
                         registers.Add(rFromInner);
                 }
-
-                var endBlockInst = new EndBlockInstruction(state, VMBlockType.Protected);
-                state.InstructionBuilder.Add(endBlockInst);
 
                 // Then visit all statements in the handlers for the exception block.
                 foreach (var s in statement.Handlers)
@@ -234,20 +252,12 @@ namespace RegiVM.VMBuilder
             {
                 List<VMRegister> registers = new List<VMRegister>();
 
-                CilExceptionHandler? handlerInfo = clause.Tag as CilExceptionHandler;
-
-                var startBlockInst = new StartBlockInstruction(state, handlerInfo!.HandlerType.ToVMBlockHandlerType());
-                state.InstructionBuilder.Add(startBlockInst);
-
                 foreach (var s in clause.Contents.Statements)
                 {
                     var rFromInner = s.Accept(this, state);
                     if (rFromInner != null)
                         registers.Add(rFromInner);
                 }
-
-                var endBlockInst = new EndBlockInstruction(state, handlerInfo!.HandlerType.ToVMBlockHandlerType());
-                state.InstructionBuilder.Add(endBlockInst);
 
                 return null!;
             }
@@ -361,7 +371,6 @@ namespace RegiVM.VMBuilder
                         else if (inst.IsConditionalBranch())
                         {
                             // Technically there should be something already on the stack??
-
                         }
 
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
@@ -442,7 +451,10 @@ namespace RegiVM.VMBuilder
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
                         // Always add as used mapping.
                         state.InstructionBuilder.AddUsedMapping(position);
+                        //if (IsInProtectedRegion(state, position, instTarget, indexOfInstruction, out int regionStartOffset))
+                        //{
 
+                        //}
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
 

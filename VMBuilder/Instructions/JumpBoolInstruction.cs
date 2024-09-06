@@ -8,6 +8,7 @@ namespace RegiVM.VMBuilder.Instructions
         public override ulong OpCode { get; }
         public int JumpOffset { get; }
         public bool ShouldInvert { get; }
+        public bool IsLeave { get; }
         public override byte[] ByteCode { get; }
         public VMRegister TempReg1 { get; }
 
@@ -27,6 +28,10 @@ namespace RegiVM.VMBuilder.Instructions
             {
                 ShouldInvert = true;
             }
+            if (inst.OpCode.Code == CilCode.Leave)
+            {
+                IsLeave = true;
+            }
 
             ByteCode = ToByteArray();
         }
@@ -40,6 +45,7 @@ namespace RegiVM.VMBuilder.Instructions
             {
                 writer.Write(JumpOffset);
                 writer.Write(ShouldInvert);
+                writer.Write(IsLeave);
                 writer.Write(TempReg1.RawName);
                 return memStream.ToArray();
             }

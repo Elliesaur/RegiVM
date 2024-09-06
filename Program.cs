@@ -82,9 +82,17 @@ namespace RegiVM
                 d = d / 0;
                 d = d + 5;
             }
-            catch (Exception e)
+            catch (DivideByZeroException e)
             {
                 d = d / 1;
+            }
+            catch (ArgumentOutOfRangeException f)
+            {
+                d = d / 2;
+            }
+            catch (Exception g)
+            {
+                d = d / 3;
             }
             finally
             {
@@ -424,6 +432,7 @@ namespace RegiVM
                 tracker += 4;
                 
                 bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
+                bool isLeaveProtected = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
 
                 byte[] shouldSkipTrackerRegName = d.Skip(tracker).ToArray();
                 tracker += shouldSkipTrackerRegName.Length;
@@ -432,17 +441,86 @@ namespace RegiVM
 
                 // Should this branch happen?
                 bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
+                if (isLeaveProtected/* && t.BlockStack.Count > 0*/)
+                {
+                    // TODO: Find and possibly execute finally/fault handler associated.
+                    // Block stack contains the current block on.
 
-                if (!shouldInvert && shouldBranch)
-                {
-                    // Lol, just set the tracker to the god damn thing.
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                } 
-                else if (shouldInvert && !shouldBranch)
-                {
-                    // Lol, just set the tracker to the god damn thing.
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    //var blockType = t.BlockStack.Pop();
+                    //if (blockType == VMBlockType.Protected)
+                    //{
+                    //    // Take turn into finally.
+                    //    // TODO: Find associated finally for the current block...
+                    //}
+
+                    if (!shouldInvert && shouldBranch)
+                    {
+                        // Lol, just set the tracker to the god damn thing.
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                    else if (shouldInvert && !shouldBranch)
+                    {
+                        // Lol, just set the tracker to the god damn thing.
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
                 }
+                else
+                {
+                    if (!shouldInvert && shouldBranch)
+                    {
+                        // Lol, just set the tracker to the god damn thing.
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                    else if (shouldInvert && !shouldBranch)
+                    {
+                        // Lol, just set the tracker to the god damn thing.
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                }
+                
+                return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.StartBlock, (t, h, d, _) =>
+            {
+                // Exception Handlers
+                int tracker = 0;
+
+                byte blockType = d.Skip(tracker).Take(1).ToArray()[0];
+                tracker++;
+
+                int handlerCount = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                tracker += 4;
+                List<VMRuntimeExceptionHandler> handlers = new List<VMRuntimeExceptionHandler>();
+                for (int i = 0; i < handlerCount; i++)
+                {
+                    var handler = new VMRuntimeExceptionHandler();
+                    handler.Type = (VMBlockType)d.Skip(tracker).Take(1).ToArray()[0];
+                    tracker++;
+
+                    int handlerOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (handlerOffsetStartIndex > 0)
+                    {
+                        handler.HandlerOffsetStart = t.InstructionOffsetMappings[handlerOffsetStartIndex].Item1;
+                    }
+
+                    int filterOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (filterOffsetStartIndex > 0)
+                    {
+                        handler.FilterOffsetStart = t.InstructionOffsetMappings[filterOffsetStartIndex].Item1;
+                    }
+
+                    uint exceptionTypeToken = BitConverter.ToUInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (exceptionTypeToken != 0)
+                    {
+                        handler.ExceptionType = typeof(VMRuntimeExceptionHandler).Module.ResolveType((int)exceptionTypeToken);
+                    }
+
+                    t.ExceptionHandlers.Push(handler);
+                }
+
                 return tracker;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, (t, h, d, _) =>

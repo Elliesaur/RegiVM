@@ -20,6 +20,8 @@ namespace RegiVM.VMRuntime
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
 
+        public Stack<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new Stack<VMRuntimeExceptionHandler>();
+
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
