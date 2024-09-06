@@ -9,13 +9,14 @@ using System.IO.Compression;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using AsmResolver.PE.DotNet.Cil;
 using System.Reflection.Emit;
+using Echo.Ast;
 
 namespace RegiVM.VMBuilder
 {
     public class InstructionBuilder
     {
         private readonly List<VMInstruction> _instructions = new List<VMInstruction>();
-        private readonly List<Tuple<CilInstruction, ulong>> _realInstructions = new List<Tuple<CilInstruction, ulong>>();
+        private readonly List<Tuple<object, ulong>> _realInstructions = new List<Tuple<object, ulong>>();
         private readonly Dictionary<int, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<int, Tuple<int, int>>();
         private readonly List<int> _usedInstructionIndexes = new List<int>();
 
@@ -36,9 +37,16 @@ namespace RegiVM.VMBuilder
 
         }
 
-        public void AddDryPass(ulong code, CilInstruction realInstruction)
+        public void AddDryPass(ulong code, object realInstruction, int index = -1)
         {
-            _realInstructions.Add(new Tuple<CilInstruction, ulong>(realInstruction, code));
+            if (index != -1)
+            {
+                _realInstructions[index] = new Tuple<object, ulong>(realInstruction, code);
+            }
+            else
+            {
+                _realInstructions.Add(new Tuple<object, ulong>(realInstruction, code));
+            }
         }
 
         public int InstructionToOffset(CilInstruction realInstruction)
@@ -125,6 +133,11 @@ namespace RegiVM.VMBuilder
                 default:
                     return false;
             }
+        }
+
+        public int FindIndexForObject(object statement)
+        {
+            return _realInstructions.IndexOf(_realInstructions.First(x => x.Item1 == statement));
         }
     }
 }

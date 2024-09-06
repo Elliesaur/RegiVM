@@ -1,4 +1,5 @@
 ﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
 using Echo.Ast.Analysis;
@@ -10,6 +11,7 @@ using Echo.DataFlow;
 using Echo.DataFlow.Construction;
 using Echo.Platforms.AsmResolver;
 using Microsoft.Win32;
+using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
 using System;
 using System.Collections.Generic;
@@ -60,6 +62,7 @@ namespace RegiVM.VMBuilder
         public ScopeBlock<CilInstruction> MethodBlocks { get; private set; }
         public ControlFlowGraph<CilInstruction> MethodStaticFlowGraph { get; private set; }
         public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
+        public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
 
         public VMCompiler()
         {
@@ -105,8 +108,16 @@ namespace RegiVM.VMBuilder
 
             method.CilMethodBody!.Instructions.ExpandMacros();
 
-            var dryPass = new VMNodeVisitorDryPass();
+            // Dry pass without exception handlers.
+            var dryPass = new VMNodeVisitorDryPass(false);
             dryPass.Visit(astCompUnit, this);
+
+            ExceptionHandlers.AddRange(CompileExceptionHandlers(CurrentMethod.CilMethodBody!.ExceptionHandlers.ToList()));
+
+            // Dry pass with exception handlers.
+            dryPass = new VMNodeVisitorDryPass(true);
+            dryPass.Visit(astCompUnit, this);
+
 
             var visitor = new VMNodeVisitor();
             visitor.Visit(astCompUnit, this);
@@ -118,5 +129,59 @@ namespace RegiVM.VMBuilder
 
             return InstructionBuilder.ToByteArray(true);
         }
+
+
+        public List<VMExceptionHandler> CompileExceptionHandlers(List<CilExceptionHandler> handlers)
+        {
+            var results = new List<VMExceptionHandler>();
+            foreach (var handler in handlers)
+            {
+                var vmHandler = new VMExceptionHandler();
+                vmHandler.Type = handler.HandlerType.ToVMBlockHandlerType();
+                CilInstruction? handlerStartInst = CurrentMethod.CilMethodBody!.Instructions.GetByOffset(handler.HandlerStart?.Offset ?? -1);
+                CilInstruction? filterStartInst = CurrentMethod.CilMethodBody!.Instructions.GetByOffset(handler.FilterStart?.Offset ?? -1);
+                if (handlerStartInst != null)
+                {
+                    var indexOfInstruction = CurrentMethod.CilMethodBody!.Instructions.IndexOf(handlerStartInst);
+                    var tries = 0;
+                    while (!InstructionBuilder.IsValidOpCode(handlerStartInst.OpCode.Code) && tries++ < 5)
+                    {
+                        handlerStartInst = CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                    }
+                    if (tries >= 5)
+                    {
+                        throw new Exception("Cannot process handler start. No target found.");
+                    }
+                    vmHandler.HandlerIndexStart = InstructionBuilder.InstructionToOffset(handlerStartInst);
+                    InstructionBuilder.AddUsedMapping(vmHandler.HandlerIndexStart);
+                }
+                if (filterStartInst != null)
+                {
+                    var indexOfInstruction = CurrentMethod.CilMethodBody!.Instructions.IndexOf(filterStartInst);
+                    var tries = 0;
+                    while (!InstructionBuilder.IsValidOpCode(filterStartInst.OpCode.Code) && tries++ < 5)
+                    {
+                        filterStartInst = CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                    }
+                    if (tries >= 5)
+                    {
+                        throw new Exception("Cannot process handler start. No target found.");
+                    }
+                    vmHandler.FilterIndexStart = InstructionBuilder.InstructionToOffset(filterStartInst);
+                    InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart);
+                }
+                if (handler.ExceptionType != null)
+                {
+                    vmHandler.ExceptionTypeMetadataToken = handler.ExceptionType.MetadataToken.ToUInt32();
+                }
+                vmHandler.TryOffsetStart = handler.TryStart!.Offset;
+                vmHandler.TryOffsetEnd = handler.TryEnd!.Offset;
+                vmHandler.PlaceholderStartInstruction = new CilInstruction(CilOpCodes.Prefix7, vmHandler);
+
+                results.Add(vmHandler);
+            }
+            return results;
+        }
+
     }
 }

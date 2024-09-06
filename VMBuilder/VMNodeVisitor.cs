@@ -14,6 +14,13 @@ namespace RegiVM.VMBuilder
     {
         public class VMNodeVisitorDryPass : IAstNodeVisitor<CilInstruction, VMCompiler>
         {
+            private bool isExceptionHandlerDryPass;
+
+            public VMNodeVisitorDryPass(bool isExceptionHandlerDryPass)
+            {
+                this.isExceptionHandlerDryPass = isExceptionHandlerDryPass;
+            }
+
             public void Visit(CompilationUnit<CilInstruction> unit, VMCompiler state)
             {
                 unit.Root.Accept(this, state);
@@ -39,7 +46,34 @@ namespace RegiVM.VMBuilder
 
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
-                state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, new CilInstruction(CilOpCodes.Prefix7));
+                if (isExceptionHandlerDryPass)
+                {
+                    VMExceptionHandler vmHandler = new VMExceptionHandler();
+                    foreach (var handler in statement.Handlers.Select(x => (CilExceptionHandler)x.Tag))
+                    {
+                        vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == handler.TryStart!.Offset
+                            && x.TryOffsetEnd == handler.TryEnd!.Offset
+                            && x.Type == handler.HandlerType.ToVMBlockHandlerType()
+                            );
+                        if (vmHandler.PlaceholderStartInstruction != null)
+                        {
+                            break;
+                        }
+                        // May need to add more search params to this.
+                    }
+                    if (vmHandler.PlaceholderStartInstruction == null)
+                    {
+                        throw new Exception("Could not find associated vmHandler for the exception types.");
+                    }
+                    var indx = state.InstructionBuilder.FindIndexForObject(statement);
+                    // Instead of adding, look up the previous block.
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, vmHandler.PlaceholderStartInstruction!, indx);
+                }
+                else
+                {
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, statement);
+                }
+
                 foreach (var s in statement.ProtectedBlock.Statements)
                 {
                      s.Accept(this, state);
@@ -447,10 +481,30 @@ namespace RegiVM.VMBuilder
                         {
                             // Technically there should be something already on the stack??
                         }
-                        
+
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+
                         // Always add as used mapping.
+                        if (inst.OpCode.Code != CilCode.Leave)
+                        {
+                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers.OrderBy(x => x.TryStart?.Offset))
+                            {
+                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                {
+                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                    if (vmHandler.TryOffsetStart >= 0)
+                                    {
+                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                    }
+                                }
+                            }
+                        }
+                        
                         state.InstructionBuilder.AddUsedMapping(position);
+
                         //if (IsInProtectedRegion(state, position, instTarget, indexOfInstruction, out int regionStartOffset))
                         //{
 

@@ -21,9 +21,13 @@ namespace RegiVM.VMBuilder.Instructions
     public struct VMExceptionHandler
     {
         public VMBlockType Type;
+        public int TryOffsetStart;
+        public int TryOffsetEnd;
         public int HandlerIndexStart;
         public int FilterIndexStart;
         public uint ExceptionTypeMetadataToken;
+
+        public CilInstruction PlaceholderStartInstruction;
 
         public void WriteBytes(BinaryWriter writer)
         {
@@ -57,55 +61,9 @@ namespace RegiVM.VMBuilder.Instructions
             BlockType = blockType;
 
             var cilHandlers = handlers.Select(x => (CilExceptionHandler)x.Tag!).ToList();
-            CompileExceptionHandlers(cilHandlers);
-
+            ExceptionHandlers = compiler.CompileExceptionHandlers(cilHandlers);
+            
             ByteCode = ToByteArray();
-        }
-
-        private void CompileExceptionHandlers(List<CilExceptionHandler> handlers)
-        {
-            foreach (var handler in handlers)
-            {
-                var vmHandler = new VMExceptionHandler();
-                vmHandler.Type = handler.HandlerType.ToVMBlockHandlerType();
-                CilInstruction? handlerStartInst = compiler.CurrentMethod.CilMethodBody!.Instructions.GetByOffset(handler.HandlerStart?.Offset ?? -1);
-                CilInstruction? filterStartInst = compiler.CurrentMethod.CilMethodBody!.Instructions.GetByOffset(handler.FilterStart?.Offset ?? -1);
-                if (handlerStartInst != null)
-                {
-                    var indexOfInstruction = compiler.CurrentMethod.CilMethodBody!.Instructions.IndexOf(handlerStartInst);
-                    var tries = 0;
-                    while (!compiler.InstructionBuilder.IsValidOpCode(handlerStartInst.OpCode.Code) && tries++ < 5)
-                    {
-                        handlerStartInst = compiler.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
-                    }
-                    if (tries >= 5)
-                    {
-                        throw new Exception("Cannot process handler start. No target found.");
-                    }
-                    vmHandler.HandlerIndexStart = compiler.InstructionBuilder.InstructionToOffset(handlerStartInst);
-                    compiler.InstructionBuilder.AddUsedMapping(vmHandler.HandlerIndexStart);
-                }
-                if (filterStartInst != null)
-                {
-                    var indexOfInstruction = compiler.CurrentMethod.CilMethodBody!.Instructions.IndexOf(filterStartInst);
-                    var tries = 0;
-                    while (!compiler.InstructionBuilder.IsValidOpCode(filterStartInst.OpCode.Code) && tries++ < 5)
-                    {
-                        filterStartInst = compiler.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
-                    }
-                    if (tries >= 5)
-                    {
-                        throw new Exception("Cannot process handler start. No target found.");
-                    }
-                    vmHandler.FilterIndexStart = compiler.InstructionBuilder.InstructionToOffset(filterStartInst);
-                    compiler.InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart);
-                }
-                if (handler.ExceptionType != null)
-                {
-                    vmHandler.ExceptionTypeMetadataToken = handler.ExceptionType.MetadataToken.ToUInt32();
-                }
-                ExceptionHandlers.Add(vmHandler);
-            }
         }
 
         public override byte[] ToByteArray()
