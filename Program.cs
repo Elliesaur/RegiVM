@@ -80,10 +80,15 @@ namespace RegiVM
             try
             {
                 d = d / 0;
+                // exception happens
+                // -> push to the handler.
                 d = d + 5;
             }
             catch (DivideByZeroException e)
             {
+                // value pushed by the CLR that contains object reference for the exception just thrown.
+                // <>
+                // stloc <e>
                 d = d / 1;
             }
             catch (ArgumentOutOfRangeException f)
@@ -407,13 +412,25 @@ namespace RegiVM
             {
                 // This covers loading and storing.
                 int tracker = 0;
+                DataType fromDataType = (DataType)d.Skip(tracker++).Take(1).ToArray()[0];
+
                 byte[] from = t.ReadBytes(d, ref tracker, out int fromLength);
                 byte[] to = t.ReadBytes(d, ref tracker, out int toLength);
                 
                 ByteArrayKey fromReg = new ByteArrayKey(from);
                 ByteArrayKey toReg = new ByteArrayKey(to);
+                byte[] valueFrom = new byte[0];
+                if (fromDataType == DataType.Phi)
+                {
+                    // Load exception....?
+                    // We know we are in a stloc.
+                    valueFrom = t.ActiveExceptionHandler.ExceptionTypeObjectKey;
+                }
+                else
+                {
+                    valueFrom = h[fromReg];
+                }
 
-                var valueFrom = h[fromReg];
                 if (!h.ContainsKey(toReg))
                 {
                     h.Add(toReg, valueFrom);
@@ -441,28 +458,17 @@ namespace RegiVM
 
                 // Should this branch happen?
                 bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
-                if (isLeaveProtected/* && t.BlockStack.Count > 0*/)
+                if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
                 {
-                    // TODO: Find and possibly execute finally/fault handler associated.
-                    // Block stack contains the current block on.
-
-                    //var blockType = t.BlockStack.Pop();
-                    //if (blockType == VMBlockType.Protected)
-                    //{
-                    //    // Take turn into finally.
-                    //    // TODO: Find associated finally for the current block...
-                    //}
-
-                    if (!shouldInvert && shouldBranch)
-                    {
-                        // Lol, just set the tracker to the god damn thing.
-                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                    }
-                    else if (shouldInvert && !shouldBranch)
-                    {
-                        // Lol, just set the tracker to the god damn thing.
-                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                    }
+                    // Clear all other handlers for the same exception handler
+                    // Execute finally associated (if any on stack).
+                    var finallyClause = t.ExceptionHandlers.Pop();
+                    t.ActiveExceptionHandler = finallyClause;
+                    tracker = finallyClause.HandlerOffsetStart;
+                }
+                else if (isLeaveProtected)
+                {
+                    throw new Exception("Exception handler missing from stack.");
                 }
                 else
                 {
@@ -518,7 +524,37 @@ namespace RegiVM
                         handler.ExceptionType = typeof(VMRuntimeExceptionHandler).Module.ResolveType((int)exceptionTypeToken);
                     }
 
+                    byte[] exceptionObjectKey = t.ReadBytes(d, ref tracker, out var exceptionObjectKeyLength);
+                    handler.ExceptionTypeObjectKey = exceptionObjectKey;
+
+                    int id = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    handler.Id = id;
                     t.ExceptionHandlers.Push(handler);
+                }
+
+                return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.LoadPhi, (t, h, d, _) => 
+            {
+                int tracker = 0;
+                // read temp reg
+                // store the metadata token for the active exception handler?
+                // TODO: or do I provide a random int in runtime exception handlers?
+                byte[] tempReg = t.ReadBytes(d, ref tracker, out int tempRegLength);
+
+                ByteArrayKey tempRegKey = new ByteArrayKey(tempReg);
+
+                // When someone wants to reference our current exception object, you need to know the local
+                // Look up the heap key for that local (register)
+                // Look up the value you retrieve as a byte array key in the object heap.
+                if (!h.ContainsKey(tempRegKey))
+                {
+                    h.Add(tempRegKey, t.ActiveExceptionHandler.ExceptionTypeObjectKey);
+                }
+                else
+                {
+                    h[tempRegKey] = t.ActiveExceptionHandler.ExceptionTypeObjectKey;
                 }
 
                 return tracker;

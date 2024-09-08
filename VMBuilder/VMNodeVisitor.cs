@@ -12,13 +12,19 @@ namespace RegiVM.VMBuilder
 {
     public partial class VMCompiler
     {
+        public enum DryPass
+        {
+            ExceptionHandlers = 1,
+            Phi = 2,
+            Regular = 3
+        }
         public class VMNodeVisitorDryPass : IAstNodeVisitor<CilInstruction, VMCompiler>
         {
-            private bool isExceptionHandlerDryPass;
+            private DryPass dryPassType;
 
-            public VMNodeVisitorDryPass(bool isExceptionHandlerDryPass)
+            public VMNodeVisitorDryPass(DryPass dryPass)
             {
-                this.isExceptionHandlerDryPass = isExceptionHandlerDryPass;
+                this.dryPassType = dryPass;
             }
 
             public void Visit(CompilationUnit<CilInstruction> unit, VMCompiler state)
@@ -34,7 +40,6 @@ namespace RegiVM.VMBuilder
             {
                 statement.Expression.Accept(this, state);
             }
-
             
             public void Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
             {
@@ -46,7 +51,7 @@ namespace RegiVM.VMBuilder
 
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
-                if (isExceptionHandlerDryPass)
+                if (dryPassType == DryPass.ExceptionHandlers)
                 {
                     VMExceptionHandler vmHandler = new VMExceptionHandler();
                     foreach (var handler in statement.Handlers.Select(x => (CilExceptionHandler)x.Tag))
@@ -94,7 +99,17 @@ namespace RegiVM.VMBuilder
 
             public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
             {
-                state.InstructionBuilder.AddDryPass(state.OpCodes.LoadPhi, null);
+                // Create a compile time struct for loading phi
+                // do a pass where I make placeholder vars
+                // do another where I create the associated instruction to refer to later.
+                if (dryPassType == DryPass.Phi)
+                {
+
+                }
+                else
+                {
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.LoadPhi, statement);
+                }
             }
 
             public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
@@ -408,6 +423,31 @@ namespace RegiVM.VMBuilder
                         }
 
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+
+                        // Always add as used mapping.
+                        if (inst.OpCode.Code != CilCode.Leave)
+                        {
+                            // We always order by the handler type descending because this puts finally ahead of exception.
+                            // We want them to be on the earliest try that they are within.
+                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                .OrderByDescending(x => x.HandlerType)
+                                .ThenBy(x => x.TryStart?.Offset))
+                            {
+                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                {
+                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                    if (vmHandler.TryOffsetStart >= 0)
+                                    {
+                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         state.InstructionBuilder.AddUsedMapping(position);
 
                         var brInst = new JumpBoolInstruction(state, position, inst);
@@ -487,7 +527,11 @@ namespace RegiVM.VMBuilder
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
                         {
-                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers.OrderBy(x => x.TryStart?.Offset))
+                            // We always order by the handler type descending because this puts finally ahead of exception.
+                            // We want them to be on the earliest try that they are within.
+                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                .OrderByDescending(x => x.HandlerType)
+                                .ThenBy(x => x.TryStart?.Offset))
                             {
                                 if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
                                 {
@@ -498,6 +542,7 @@ namespace RegiVM.VMBuilder
                                     if (vmHandler.TryOffsetStart >= 0)
                                     {
                                         position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                        break;
                                     }
                                 }
                             }
@@ -505,17 +550,13 @@ namespace RegiVM.VMBuilder
                         
                         state.InstructionBuilder.AddUsedMapping(position);
 
-                        //if (IsInProtectedRegion(state, position, instTarget, indexOfInstruction, out int regionStartOffset))
-                        //{
-
-                        //}
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
 
                         // There is no register for this operation, leave it null.
                         reg = null!;
                     }
-                    // TODO: Null check? But nah... caller does it.
+
                     return reg;
                 }
                 

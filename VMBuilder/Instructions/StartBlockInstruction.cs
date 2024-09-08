@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static RegiVM.VMRuntime.RegiVMRuntime;
 
 namespace RegiVM.VMBuilder.Instructions
 {
@@ -23,10 +24,11 @@ namespace RegiVM.VMBuilder.Instructions
         public VMBlockType Type;
         public int TryOffsetStart;
         public int TryOffsetEnd;
+        public int Id;
         public int HandlerIndexStart;
         public int FilterIndexStart;
         public uint ExceptionTypeMetadataToken;
-
+        public byte[] ExceptionTypeObjectKey;
         public CilInstruction PlaceholderStartInstruction;
 
         public void WriteBytes(BinaryWriter writer)
@@ -35,6 +37,9 @@ namespace RegiVM.VMBuilder.Instructions
             writer.Write(HandlerIndexStart);
             writer.Write(FilterIndexStart);
             writer.Write(ExceptionTypeMetadataToken);
+            writer.Write(ExceptionTypeObjectKey.Length);
+            writer.Write(ExceptionTypeObjectKey);
+            writer.Write(Id);
         }
     }
     public struct VMRuntimeExceptionHandler
@@ -43,6 +48,8 @@ namespace RegiVM.VMBuilder.Instructions
         public int HandlerOffsetStart;
         public int FilterOffsetStart;
         public Type ExceptionType;
+        public byte[] ExceptionTypeObjectKey;
+        public int Id;
     }
     public class StartBlockInstruction : VMInstruction
     {

@@ -42,7 +42,9 @@ namespace RegiVM.VMBuilder
 
         String = 0x11,
 
-        Boolean = 0x12
+        Boolean = 0x12,
+
+        Phi = 0x13
     }
 
     public partial class VMCompiler
@@ -109,13 +111,13 @@ namespace RegiVM.VMBuilder
             method.CilMethodBody!.Instructions.ExpandMacros();
 
             // Dry pass without exception handlers.
-            var dryPass = new VMNodeVisitorDryPass(false);
+            var dryPass = new VMNodeVisitorDryPass(DryPass.Regular);
             dryPass.Visit(astCompUnit, this);
 
             ExceptionHandlers.AddRange(CompileExceptionHandlers(CurrentMethod.CilMethodBody!.ExceptionHandlers.ToList()));
 
             // Dry pass with exception handlers.
-            dryPass = new VMNodeVisitorDryPass(true);
+            dryPass = new VMNodeVisitorDryPass(DryPass.ExceptionHandlers);
             dryPass.Visit(astCompUnit, this);
 
 
@@ -176,8 +178,22 @@ namespace RegiVM.VMBuilder
                 }
                 vmHandler.TryOffsetStart = handler.TryStart!.Offset;
                 vmHandler.TryOffsetEnd = handler.TryEnd!.Offset;
-                vmHandler.PlaceholderStartInstruction = new CilInstruction(CilOpCodes.Prefix7, vmHandler);
 
+                var sameRegionProtectedHandlers = results
+                    .Where(x => x.TryOffsetStart == vmHandler.TryOffsetStart && 
+                        x.TryOffsetEnd == vmHandler.TryOffsetEnd);
+                if (sameRegionProtectedHandlers.Any())
+                {
+                    vmHandler.Id = sameRegionProtectedHandlers.First().Id;
+                }
+                else
+                {
+                    var highestId = results.OrderByDescending(x => x.Id).FirstOrDefault();
+                    vmHandler.Id = highestId.Id + 1;
+                }
+
+                vmHandler.PlaceholderStartInstruction = new CilInstruction(CilOpCodes.Prefix7, vmHandler);
+                vmHandler.ExceptionTypeObjectKey = Guid.NewGuid().ToByteArray();
                 results.Add(vmHandler);
             }
             return results;

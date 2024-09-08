@@ -11,17 +11,54 @@ namespace RegiVM.VMRuntime
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
 
         internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
+        internal ByteArrayKey LOAD_PHI = new ByteArrayKey([0xff, 0xff, 0x1, 0x5]);
         internal ByteArrayKey RETURN_REGISTER;
 
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
 
+        // Special heap for objects? Idk... maybe redo this.
+        private Dictionary<ByteArrayKey, object> ObjectHeap { get; } = new Dictionary<ByteArrayKey, object>();
+
         public Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>> OpCodeHandlers { get; } = new Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>>();
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
 
-        public Stack<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new Stack<VMRuntimeExceptionHandler>();
+        public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; }
 
+        public ItsAlmostAStack<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new ItsAlmostAStack<VMRuntimeExceptionHandler>();
+        public class ItsAlmostAStack<T>
+        {
+            public List<T> items = new List<T>();
+            public int Count => items.Count;
+
+            public void Push(T item)
+            {
+                items.Add(item);
+            }
+            
+            public T Peek()
+            {
+                return items[items.Count - 1];
+            }
+
+            public T Pop()
+            {
+                if (items.Count > 0)
+                {
+                    T temp = items[items.Count - 1];
+                    items.RemoveAt(items.Count - 1);
+                    return temp;
+                }
+                else
+                    return default(T);
+            }
+
+            public void Remove(T item)
+            {
+                items.Remove(item);
+            }
+        }
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
@@ -98,15 +135,80 @@ namespace RegiVM.VMRuntime
             // TODO: This works great... If any issues, use this.
             //ip += operandLength;
 
-            var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
-            // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
-            if (track != operandLength)
+            try
             {
-                ip = track;
+                var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
+                // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
+                if (track != operandLength)
+                {
+                    ip = track;
+                }
+                else
+                {
+                    ip += track;
+                }
             }
-            else
+            catch (Exception vmException)
             {
-                ip += track;
+                var isHandled = false;
+
+                while (ExceptionHandlers.Count > 0)
+                {
+                    var handler = ExceptionHandlers.Pop();
+
+                    if (handler.Type == VMBlockType.Exception)
+                    {
+                        if (handler.ExceptionType.IsAssignableFrom(vmException.GetType()))
+                        {
+                            ActiveExceptionHandler = handler;
+
+                            // Set IP to handler start?
+                            ip = handler.HandlerOffsetStart;
+                            //ObjectHeap[LOAD_PHI] = vmException;
+
+                            // LOAD_PHI <TEMP_PHI>
+                            // STORE_LOCAL <REG> <TEMP_PHI>
+                            ByteArrayKey handlerKey = new ByteArrayKey(handler.ExceptionTypeObjectKey);
+
+                            // Try/catching multiple of the same exception type...
+                            // A reference to this will be lost after the second.
+                            if (!ObjectHeap.ContainsKey(handlerKey))
+                            {
+                                ObjectHeap.Add(handlerKey, vmException);
+                            }
+                            else
+                            {
+                                ObjectHeap[handlerKey] = vmException;
+                            }
+
+                            isHandled = true;
+
+                            // Make sure we clear the exception handlers for the same protected block...
+                            var existing = ExceptionHandlers.items.Where(x => x.Id == ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
+                            foreach (var exist in existing.ToList())
+                            {
+                                ExceptionHandlers.Remove(exist);
+                            }
+
+                            break;
+                        }
+                    }
+                }
+
+                if (!isHandled)
+                {
+                    // We throw this.
+                    throw;
+                }
+
+                // Pop the exception handlers.
+                // Check if vmException is of type vmhandler.Type?
+                // If it is, set IP to the handler start.
+                // Else, continue to unwind until there is no more exception handlers on the stack.
+                // If no handlers support it, throw the exception and DO NOT call the finally.
+                // If handled, and exiting the handler, make sure we execute the finally.
+
+                // Always execute finally... (handle this later).
             }
         }
 

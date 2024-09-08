@@ -11,10 +11,10 @@ namespace RegiVM.VMBuilder.Instructions
         public LoadPhiInstruction(VMCompiler compiler)
         {
             Registers = compiler.RegisterHelper;
-            OpCode = compiler.OpCodes.StartBlock;
+            OpCode = compiler.OpCodes.LoadPhi;
 
             TempReg1 = Registers.ForTemp();
-            TempReg1.DataType = DataType.Unknown;
+            TempReg1.DataType = DataType.Phi;
 
             ByteCode = ToByteArray();
         }
