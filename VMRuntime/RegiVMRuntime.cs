@@ -9,9 +9,7 @@ namespace RegiVM.VMRuntime
     internal class RegiVMRuntime
     {
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
-
         internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
-        internal ByteArrayKey LOAD_PHI = new ByteArrayKey([0xff, 0xff, 0x1, 0x5]);
         internal ByteArrayKey RETURN_REGISTER;
 
         // A heap which contains a list of bytes, the key is the register.
@@ -26,39 +24,8 @@ namespace RegiVM.VMRuntime
 
         public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; }
 
-        public ItsAlmostAStack<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new ItsAlmostAStack<VMRuntimeExceptionHandler>();
-        public class ItsAlmostAStack<T>
-        {
-            public List<T> items = new List<T>();
-            public int Count => items.Count;
+        public StackList<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new StackList<VMRuntimeExceptionHandler>();
 
-            public void Push(T item)
-            {
-                items.Add(item);
-            }
-            
-            public T Peek()
-            {
-                return items[items.Count - 1];
-            }
-
-            public T Pop()
-            {
-                if (items.Count > 0)
-                {
-                    T temp = items[items.Count - 1];
-                    items.RemoveAt(items.Count - 1);
-                    return temp;
-                }
-                else
-                    return default(T);
-            }
-
-            public void Remove(T item)
-            {
-                items.Remove(item);
-            }
-        }
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
@@ -132,8 +99,6 @@ namespace RegiVM.VMRuntime
             ip += 4;
 
             byte[] operandValue = Heap[DATA].Skip(ip).Take(operandLength).ToArray();
-            // TODO: This works great... If any issues, use this.
-            //ip += operandLength;
 
             try
             {
@@ -164,14 +129,11 @@ namespace RegiVM.VMRuntime
 
                             // Set IP to handler start?
                             ip = handler.HandlerOffsetStart;
-                            //ObjectHeap[LOAD_PHI] = vmException;
 
                             // LOAD_PHI <TEMP_PHI>
                             // STORE_LOCAL <REG> <TEMP_PHI>
                             ByteArrayKey handlerKey = new ByteArrayKey(handler.ExceptionTypeObjectKey);
 
-                            // Try/catching multiple of the same exception type...
-                            // A reference to this will be lost after the second.
                             if (!ObjectHeap.ContainsKey(handlerKey))
                             {
                                 ObjectHeap.Add(handlerKey, vmException);
@@ -184,10 +146,10 @@ namespace RegiVM.VMRuntime
                             isHandled = true;
 
                             // Make sure we clear the exception handlers for the same protected block...
-                            var existing = ExceptionHandlers.items.Where(x => x.Id == ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
-                            foreach (var exist in existing.ToList())
+                            var sameRegionHandlers = ExceptionHandlers.items.Where(x => x.Id == ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
+                            foreach (var sameRegionHandler in sameRegionHandlers.ToList())
                             {
-                                ExceptionHandlers.Remove(exist);
+                                ExceptionHandlers.Remove(sameRegionHandler);
                             }
 
                             break;
@@ -197,18 +159,9 @@ namespace RegiVM.VMRuntime
 
                 if (!isHandled)
                 {
-                    // We throw this.
+                    // We throw this to the callers, hope they have a plan! We don't! :3
                     throw;
                 }
-
-                // Pop the exception handlers.
-                // Check if vmException is of type vmhandler.Type?
-                // If it is, set IP to the handler start.
-                // Else, continue to unwind until there is no more exception handlers on the stack.
-                // If no handlers support it, throw the exception and DO NOT call the finally.
-                // If handled, and exiting the handler, make sure we execute the finally.
-
-                // Always execute finally... (handle this later).
             }
         }
 
