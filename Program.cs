@@ -1,15 +1,8 @@
 ﻿using AsmResolver.DotNet;
-using AsmResolver.DotNet.Code.Cil;
-using AsmResolver.DotNet.Collections;
-using AsmResolver.DotNet.Signatures;
-using AsmResolver.PE.DotNet.Cil;
-using AsmResolver.PE.DotNet.Metadata.Tables;
 using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
 using static RegiVM.VMRuntime.RegiVMRuntime;
 
 namespace RegiVM
@@ -84,6 +77,32 @@ namespace RegiVM
             {
                 d = 500;
             }
+            try
+            {
+                d = d / 0;
+                // exception happens
+                // -> push to the handler.
+                d = d + 5;
+            }
+            catch (DivideByZeroException e)
+            {
+                // value pushed by the CLR that contains object reference for the exception just thrown.
+                // <>
+                // stloc <e>
+                d = d / 1;
+            }
+            catch (ArgumentOutOfRangeException f)
+            {
+                d = d / 2;
+            }
+            catch (Exception g)
+            {
+                d = d / 3;
+            }
+            finally
+            {
+                d = d + 100;
+            }
             return d;
         }
     }
@@ -109,8 +128,8 @@ namespace RegiVM
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .RegisterLimit(30)
-                .RandomizeRegisterNames();
+                .RegisterLimit(30);
+                //.RandomizeRegisterNames();
             byte[] data = compiler.Compile(testMd);
 
             Console.WriteLine($"Sizeof Data {data.Length} bytes");
@@ -393,13 +412,25 @@ namespace RegiVM
             {
                 // This covers loading and storing.
                 int tracker = 0;
+                DataType fromDataType = (DataType)d.Skip(tracker++).Take(1).ToArray()[0];
+
                 byte[] from = t.ReadBytes(d, ref tracker, out int fromLength);
                 byte[] to = t.ReadBytes(d, ref tracker, out int toLength);
                 
                 ByteArrayKey fromReg = new ByteArrayKey(from);
                 ByteArrayKey toReg = new ByteArrayKey(to);
+                byte[] valueFrom = new byte[0];
+                if (fromDataType == DataType.Phi)
+                {
+                    // Load exception....?
+                    // We know we are in a stloc.
+                    valueFrom = t.ActiveExceptionHandler.ExceptionTypeObjectKey;
+                }
+                else
+                {
+                    valueFrom = h[fromReg];
+                }
 
-                var valueFrom = h[fromReg];
                 if (!h.ContainsKey(toReg))
                 {
                     h.Add(toReg, valueFrom);
@@ -416,8 +447,9 @@ namespace RegiVM
                 // OFFSET?
                 int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
                 tracker += 4;
-                
+
                 bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
+                bool isLeaveProtected = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
 
                 byte[] shouldSkipTrackerRegName = d.Skip(tracker).ToArray();
                 tracker += shouldSkipTrackerRegName.Length;
@@ -427,17 +459,106 @@ namespace RegiVM
                 // Should this branch happen?
                 bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
 
-                if (!shouldInvert && shouldBranch)
+                if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
-                    // Lol, just set the tracker to the god damn thing.
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                } 
-                else if (shouldInvert && !shouldBranch)
-                {
-                    // Lol, just set the tracker to the god damn thing.
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    // Make sure we clear the exception handlers for the same protected block...
+                    var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == t.ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
+                    foreach (var sameRegionHandler in sameRegionHandlers.ToList())
+                    {
+                        t.ExceptionHandlers.Remove(sameRegionHandler);
+                    }
+                    t.ActiveExceptionHandler = default;
+
+                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
+                    {
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
                 }
+
+                else if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+                {
+                    // Is finally instruction.
+                    var finallyClause = t.ExceptionHandlers.Pop();
+                    t.ActiveExceptionHandler = finallyClause;
+                    tracker = finallyClause.HandlerOffsetStart;
+
+                    // Store the active leave inst offset so we know where to go after the endfinally instruction.
+                    t.ActiveExceptionHandler.LeaveInstOffset = t.InstructionOffsetMappings[branchToOffset].Item1;
+                }
+                else if (isLeaveProtected)
+                {
+                    throw new Exception("Is leave protected instruction jump, but there is no handler...?");
+                }
+                else
+                {
+                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
+                    {
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                }
+                
                 return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.StartBlock, (t, h, d, _) =>
+            {
+                // Exception Handlers
+                int tracker = 0;
+
+                byte blockType = d.Skip(tracker).Take(1).ToArray()[0];
+                tracker++;
+
+                int handlerCount = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                tracker += 4;
+                List<VMRuntimeExceptionHandler> handlers = new List<VMRuntimeExceptionHandler>();
+                for (int i = 0; i < handlerCount; i++)
+                {
+                    var handler = new VMRuntimeExceptionHandler();
+                    handler.Type = (VMBlockType)d.Skip(tracker).Take(1).ToArray()[0];
+                    tracker++;
+
+                    int handlerOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (handlerOffsetStartIndex > 0)
+                    {
+                        handler.HandlerOffsetStart = t.InstructionOffsetMappings[handlerOffsetStartIndex].Item1;
+                    }
+
+                    int filterOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (filterOffsetStartIndex > 0)
+                    {
+                        handler.FilterOffsetStart = t.InstructionOffsetMappings[filterOffsetStartIndex].Item1;
+                    }
+
+                    uint exceptionTypeToken = BitConverter.ToUInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    if (exceptionTypeToken != 0)
+                    {
+                        handler.ExceptionType = typeof(VMRuntimeExceptionHandler).Module.ResolveType((int)exceptionTypeToken);
+                    }
+
+                    byte[] exceptionObjectKey = t.ReadBytes(d, ref tracker, out var exceptionObjectKeyLength);
+                    handler.ExceptionTypeObjectKey = exceptionObjectKey;
+
+                    int id = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                    tracker += 4;
+                    handler.Id = id;
+                    t.ExceptionHandlers.Push(handler);
+                }
+
+                return tracker;
+            });
+            vm.OpCodeHandlers.Add(compiler.OpCodes.EndFinally, (t, h, d, _) =>
+            {
+                // TODO: stacked/nested finally clauses...?
+
+                // Always use the leave offset that entered the finally, to leave the finally.
+                int offsetToLeaveTo = t.ActiveExceptionHandler.LeaveInstOffset;
+
+                // Clean up current handler.
+                t.ActiveExceptionHandler = default;
+
+                return offsetToLeaveTo;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, (t, h, d, _) =>
             {

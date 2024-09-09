@@ -50,6 +50,7 @@ namespace RegiVM.VMBuilder.Instructions
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
+                writer.Write((byte)TempReg1.DataType);
                 writer.Write(TempReg1.RawName.Length);
                 writer.Write(TempReg1.RawName);
                 writer.Write(Reg1.RawName.Length);

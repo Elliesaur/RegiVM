@@ -2,15 +2,31 @@
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
+using Echo.ControlFlow.Regions;
+using Microsoft.Win32;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
+using System.Reflection.Emit;
 
 namespace RegiVM.VMBuilder
 {
     public partial class VMCompiler
     {
+        public enum DryPass
+        {
+            ExceptionHandlers = 1,
+            Phi = 2,
+            Regular = 3
+        }
         public class VMNodeVisitorDryPass : IAstNodeVisitor<CilInstruction, VMCompiler>
         {
+            private DryPass dryPassType;
+
+            public VMNodeVisitorDryPass(DryPass dryPass)
+            {
+                this.dryPassType = dryPass;
+            }
+
             public void Visit(CompilationUnit<CilInstruction> unit, VMCompiler state)
             {
                 unit.Root.Accept(this, state);
@@ -24,11 +40,7 @@ namespace RegiVM.VMBuilder
             {
                 statement.Expression.Accept(this, state);
             }
-
-            public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
-            {
-            }
-
+            
             public void Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
             {
                 foreach (var s in statement.Statements)
@@ -39,12 +51,69 @@ namespace RegiVM.VMBuilder
 
             public void Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
+                if (dryPassType == DryPass.ExceptionHandlers)
+                {
+                    VMExceptionHandler vmHandler = new VMExceptionHandler();
+                    foreach (var handler in statement.Handlers.Select(x => (CilExceptionHandler)x.Tag))
+                    {
+                        vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == handler.TryStart!.Offset
+                            && x.TryOffsetEnd == handler.TryEnd!.Offset
+                            && x.Type == handler.HandlerType.ToVMBlockHandlerType()
+                            );
+                        if (vmHandler.PlaceholderStartInstruction != null)
+                        {
+                            break;
+                        }
+                        // May need to add more search params to this.
+                    }
+                    if (vmHandler.PlaceholderStartInstruction == null)
+                    {
+                        throw new Exception("Could not find associated vmHandler for the exception types.");
+                    }
+                    var indx = state.InstructionBuilder.FindIndexForObject(statement);
+                    // Instead of adding, look up the previous block.
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, vmHandler.PlaceholderStartInstruction!, indx);
+                }
+                else
+                {
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, statement);
+                }
+
+                foreach (var s in statement.ProtectedBlock.Statements)
+                {
+                     s.Accept(this, state);
+                }
+                foreach (var s in statement.Handlers)
+                {
+                    s.Accept(this, state);
+                }
             }
 
             public void Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
             {
+                foreach (var s in clause.Contents.Statements)
+                {
+                    s.Accept(this, state);
+                }
             }
 
+            public void Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
+            {
+                // Create a compile time struct for loading phi
+                // do a pass where I make placeholder vars
+                // do another where I create the associated instruction to refer to later.
+                if (dryPassType == DryPass.Phi)
+                {
+
+                }
+                else
+                {
+                }
+            }
+
+            public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
+            {
+            }
             public void Visit(InstructionExpression<CilInstruction> expression, VMCompiler state)
             {
                 if (expression.Arguments.Count > 0)
@@ -125,6 +194,10 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.ParameterLoad, inst);
                     }
+                    if (inst.OpCode.Code == CilCode.Endfinally)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.EndFinally, inst);
+                    }
                     if (inst.IsUnconditionalBranch())
                     {
                         // Load num.
@@ -135,9 +208,7 @@ namespace RegiVM.VMBuilder
                 }
 
             }
-            public void Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
-            {
-            }
+            
         }
 
         public class VMNodeVisitor : IAstNodeVisitor<CilInstruction, VMCompiler, VMRegister>
@@ -161,7 +232,15 @@ namespace RegiVM.VMBuilder
 
             public VMRegister Visit(PhiStatement<CilInstruction> statement, VMCompiler state)
             {
-                return null!;
+                // We have to push something, otherwise things will break!
+                // A phi statement is used when it isn't quite clear what the value will be.
+                // This often happens in a catch statement when the first instruction will be "stloc".
+                // The AST has no idea how to handle the stack because technically something is pushed to the stack in runtime!!
+                //var phiInst = new LoadPhiInstruction(state);
+                //state.InstructionBuilder.Add(phiInst);
+                var temp = state.RegisterHelper.ForTemp();
+                temp.DataType = DataType.Phi;
+                return temp;
             }
 
             public VMRegister Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
@@ -176,12 +255,48 @@ namespace RegiVM.VMBuilder
 
             public VMRegister Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
+                List<VMRegister> registers = new List<VMRegister>();
+
+                // Visit all statements in the protected block.
+                var startBlockInst = new StartBlockInstruction(state, statement.Handlers, VMBlockType.Protected);
+                state.InstructionBuilder.Add(startBlockInst);
+
+                foreach (var s in statement.ProtectedBlock.Statements)
+                {
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                }
+
+                // Then visit all statements in the handlers for the exception block.
+                foreach (var s in statement.Handlers)
+                {
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                }
+
                 return null!;
             }
 
             public VMRegister Visit(HandlerClause<CilInstruction> clause, VMCompiler state)
             {
+                List<VMRegister> registers = new List<VMRegister>();
+
+                foreach (var s in clause.Contents.Statements)
+                {
+                    var rFromInner = s.Accept(this, state);
+                    if (rFromInner != null)
+                        registers.Add(rFromInner);
+                }
+
                 return null!;
+            }
+
+            public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
+            {
+                return null!;
+                //expression.Accept(this, state);
             }
 
             public VMRegister Visit(InstructionExpression<CilInstruction> expression, VMCompiler state)
@@ -287,10 +402,34 @@ namespace RegiVM.VMBuilder
                         else if (inst.IsConditionalBranch())
                         {
                             // Technically there should be something already on the stack??
-
                         }
 
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+
+                        // Always add as used mapping.
+                        if (inst.OpCode.Code != CilCode.Leave)
+                        {
+                            // We always order by the handler type descending because this puts finally ahead of exception.
+                            // We want them to be on the earliest try that they are within.
+                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                .OrderByDescending(x => x.HandlerType)
+                                .ThenBy(x => x.TryStart?.Offset))
+                            {
+                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                {
+                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                    if (vmHandler.TryOffsetStart >= 0)
+                                    {
+                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         state.InstructionBuilder.AddUsedMapping(position);
 
                         var brInst = new JumpBoolInstruction(state, position, inst);
@@ -340,6 +479,12 @@ namespace RegiVM.VMBuilder
                         reg = ldargInst.TempReg1;
 
                     }
+                    // TODO: Endfilter at some point?
+                    if (inst.OpCode.Code == CilCode.Endfinally)
+                    {
+                        var endFinallyInst = new EndFinallyInstruction(state);
+                        state.InstructionBuilder.Add(endFinallyInst, inst);
+                    }
                     if (inst.IsBranch())
                     {
                         var cilLabel = (CilInstructionLabel)inst.Operand!;
@@ -364,9 +509,33 @@ namespace RegiVM.VMBuilder
                         {
                             // Technically there should be something already on the stack??
                         }
-                        
+
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+
                         // Always add as used mapping.
+                        if (inst.OpCode.Code != CilCode.Leave)
+                        {
+                            // We always order by the handler type descending because this puts finally ahead of exception.
+                            // We want them to be on the earliest try that they are within.
+                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                .OrderByDescending(x => x.HandlerType)
+                                .ThenBy(x => x.TryStart?.Offset))
+                            {
+                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                {
+                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                    if (vmHandler.TryOffsetStart >= 0)
+                                    {
+                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
                         state.InstructionBuilder.AddUsedMapping(position);
 
                         var brInst = new JumpBoolInstruction(state, position, inst);
@@ -375,17 +544,12 @@ namespace RegiVM.VMBuilder
                         // There is no register for this operation, leave it null.
                         reg = null!;
                     }
-                    // TODO: Null check? But nah... caller does it.
+
                     return reg;
                 }
                 
             }
 
-            public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
-            {
-                return null!;
-                //expression.Accept(this, state);
-            }
         }
     }
 }

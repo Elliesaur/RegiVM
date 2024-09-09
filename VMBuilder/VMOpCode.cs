@@ -23,7 +23,8 @@ namespace RegiVM.VMBuilder
         public ulong LocalLoadStore { get; set; } = 0x11000UL;
         public ulong JumpBool { get; set; } = 0x12000UL;
         public ulong Comparator { get; set; } = 0x13000UL;
-
+        public ulong StartBlock { get; set; } = 0x14000UL;
+        public ulong EndFinally { get; set; } = 0x17000UL;
         public void RandomizeAll()
         {
             Random r = new Random();

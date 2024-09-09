@@ -1,4 +1,6 @@
-﻿using System;
+﻿using AsmResolver.DotNet.Code.Cil;
+using RegiVM.VMBuilder.Instructions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -32,6 +34,11 @@ namespace RegiVM.VMBuilder
 
                 buffer[j] = buffer[i];
             }
+        }
+
+        public static VMBlockType ToVMBlockHandlerType(this CilExceptionHandlerType exceptionHandlerType)
+        {
+            return (VMBlockType)exceptionHandlerType;
         }
     }
 }

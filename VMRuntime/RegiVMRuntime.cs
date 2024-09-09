@@ -8,17 +8,23 @@ namespace RegiVM.VMRuntime
 {
     internal class RegiVMRuntime
     {
-        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
-
+        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         internal ByteArrayKey RETURN_REGISTER;
 
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
 
+        // Special heap for objects? Idk... maybe redo this.
+        private Dictionary<ByteArrayKey, object> ObjectHeap { get; } = new Dictionary<ByteArrayKey, object>();
+
         public Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>> OpCodeHandlers { get; } = new Dictionary<ulong, Func<RegiVMRuntime, Dictionary<ByteArrayKey, byte[]>, byte[], Dictionary<int, object>, int>>();
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
+
+        public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; }
+
+        public StackList<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new StackList<VMRuntimeExceptionHandler>();
 
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
@@ -93,18 +99,62 @@ namespace RegiVM.VMRuntime
             ip += 4;
 
             byte[] operandValue = Heap[DATA].Skip(ip).Take(operandLength).ToArray();
-            // TODO: This works great... If any issues, use this.
-            //ip += operandLength;
 
-            var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
-            // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
-            if (track != operandLength)
+            try
             {
-                ip = track;
+                var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
+                // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
+                if (track != operandLength)
+                {
+                    ip = track;
+                }
+                else
+                {
+                    ip += track;
+                }
             }
-            else
+            catch (Exception vmException)
             {
-                ip += track;
+                var isHandled = false;
+
+                while (ExceptionHandlers.Count > 0)
+                {
+                    var handler = ExceptionHandlers.Pop();
+
+                    if (handler.Type == VMBlockType.Exception)
+                    {
+                        if (handler.ExceptionType.IsAssignableFrom(vmException.GetType()))
+                        {
+                            ActiveExceptionHandler = handler;
+
+                            // Set IP to handler start
+                            ip = handler.HandlerOffsetStart;
+
+                            // We want to load the object into the heap for objects and make sure the exception handler
+                            // knows what to do with the exception type object key.
+                            ByteArrayKey handlerKey = new ByteArrayKey(handler.ExceptionTypeObjectKey);
+
+                            if (!ObjectHeap.ContainsKey(handlerKey))
+                            {
+                                ObjectHeap.Add(handlerKey, vmException);
+                            }
+                            else
+                            {
+                                ObjectHeap[handlerKey] = vmException;
+                            }
+
+                            isHandled = true;
+
+                            break;
+                        }
+                    }
+                }
+
+                if (!isHandled)
+                {
+                    // We throw this to the callers, hope they have a plan! We don't! :3
+                    throw;
+                }
             }
         }
 

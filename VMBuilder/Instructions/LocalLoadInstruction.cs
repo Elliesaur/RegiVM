@@ -35,6 +35,7 @@ namespace RegiVM.VMBuilder.Instructions
             using (var writer = new BinaryWriter(memStream))
             {
                 // FROM
+                writer.Write((byte)Reg1.DataType);
                 writer.Write(Reg1.RawName.Length);
                 writer.Write(Reg1.RawName);
                 // TO
