@@ -35,13 +35,6 @@ namespace RegiVM.VMBuilder.Registers
             return reg;
         }
 
-        // TODO: Bad Ellie, bad! REMOVE!
-        private VMRegister ForPop(int depth, int push, int pop)
-        {
-            var reg = Registers.Reverse<VMRegister>().First(x => x.StackPosition == depth);
-            return reg;
-        }
-
         public VMRegister ForTemp()
         {
             var reg = new VMRegister(IsRandomNames ? $"{Guid.NewGuid().ToString()}" : $"T{_numTempTotalLife++}", RegisterType.Temporary);

@@ -108,7 +108,6 @@ namespace RegiVM.VMBuilder
                 }
                 else
                 {
-                    state.InstructionBuilder.AddDryPass(state.OpCodes.LoadPhi, statement);
                 }
             }
 
@@ -195,6 +194,10 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.ParameterLoad, inst);
                     }
+                    if (inst.OpCode.Code == CilCode.Endfinally)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.EndFinally, inst);
+                    }
                     if (inst.IsUnconditionalBranch())
                     {
                         // Load num.
@@ -233,9 +236,11 @@ namespace RegiVM.VMBuilder
                 // A phi statement is used when it isn't quite clear what the value will be.
                 // This often happens in a catch statement when the first instruction will be "stloc".
                 // The AST has no idea how to handle the stack because technically something is pushed to the stack in runtime!!
-                var phiInst = new LoadPhiInstruction(state);
-                state.InstructionBuilder.Add(phiInst);
-                return phiInst.TempReg1;
+                //var phiInst = new LoadPhiInstruction(state);
+                //state.InstructionBuilder.Add(phiInst);
+                var temp = state.RegisterHelper.ForTemp();
+                temp.DataType = DataType.Phi;
+                return temp;
             }
 
             public VMRegister Visit(BlockStatement<CilInstruction> statement, VMCompiler state)
@@ -251,29 +256,6 @@ namespace RegiVM.VMBuilder
             public VMRegister Visit(ExceptionHandlerStatement<CilInstruction> statement, VMCompiler state)
             {
                 List<VMRegister> registers = new List<VMRegister>();
-
-                // TODO: When I start a block
-                // - OpCode START_BLOCK
-                // - Operand:
-                //    For each handler:
-                //     - type
-                //     - offset start,
-                //     - offset end,
-                //     - catch class type (check for is assignable from)
-                // Keep a stack of what protected block we are in and what handlers are associated with the current block.
-                // If an exception occurs, foreach the catch exception handlers and if assignable type of exception
-                //  simply set the IP to the offset start associated with the handler
-                //  if we leave the handler (leave inst), we make sure to pop the current protected block and the associated handlers.
-                //  whenever we leave, we must also check if the finally has been run, if not, run the finally.
-                //  if in the finally, the last instruction is "endfinally" which indicates the end of the finally and restore
-                //  back to the original position after the instruction.
-
-                // Old thoughts:
-                // That way, when the runtime sees a start of a block, it notes the handlers for the current block it is in.
-                // Runtime: Use a stack to note the starting blocks. Pop from the stack when the end block appears/when the leave occurs.
-                // When you pop, simply visit the appropriate handlers, or when the "leave" instruction happens, action the handlers.
-                // When an exception occurs, visit the appropriate handler (if any).
-
 
                 // Visit all statements in the protected block.
                 var startBlockInst = new StartBlockInstruction(state, statement.Handlers, VMBlockType.Protected);
@@ -496,6 +478,12 @@ namespace RegiVM.VMBuilder
                         // Load the tempreg where the param is existing.
                         reg = ldargInst.TempReg1;
 
+                    }
+                    // TODO: Endfilter at some point?
+                    if (inst.OpCode.Code == CilCode.Endfinally)
+                    {
+                        var endFinallyInst = new EndFinallyInstruction(state);
+                        state.InstructionBuilder.Add(endFinallyInst, inst);
                     }
                     if (inst.IsBranch())
                     {

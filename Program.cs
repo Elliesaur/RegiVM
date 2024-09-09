@@ -447,7 +447,7 @@ namespace RegiVM
                 // OFFSET?
                 int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
                 tracker += 4;
-                
+
                 bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
                 bool isLeaveProtected = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
 
@@ -458,28 +458,41 @@ namespace RegiVM
 
                 // Should this branch happen?
                 bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
-                if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+
+                if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
-                    // Clear all other handlers for the same exception handler
-                    // Execute finally associated (if any on stack).
+                    // Make sure we clear the exception handlers for the same protected block...
+                    var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == t.ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
+                    foreach (var sameRegionHandler in sameRegionHandlers.ToList())
+                    {
+                        t.ExceptionHandlers.Remove(sameRegionHandler);
+                    }
+                    t.ActiveExceptionHandler = default;
+
+                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
+                    {
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                }
+
+                else if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+                {
+                    // Is finally instruction.
                     var finallyClause = t.ExceptionHandlers.Pop();
                     t.ActiveExceptionHandler = finallyClause;
                     tracker = finallyClause.HandlerOffsetStart;
+
+                    // Store the active leave inst offset so we know where to go after the endfinally instruction.
+                    t.ActiveExceptionHandler.LeaveInstOffset = t.InstructionOffsetMappings[branchToOffset].Item1;
                 }
                 else if (isLeaveProtected)
                 {
-                    throw new Exception("Exception handler missing from stack.");
+                    throw new Exception("Is leave protected instruction jump, but there is no handler...?");
                 }
                 else
                 {
-                    if (!shouldInvert && shouldBranch)
+                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
                     {
-                        // Lol, just set the tracker to the god damn thing.
-                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                    }
-                    else if (shouldInvert && !shouldBranch)
-                    {
-                        // Lol, just set the tracker to the god damn thing.
                         tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
                     }
                 }
@@ -535,29 +548,17 @@ namespace RegiVM
 
                 return tracker;
             });
-            vm.OpCodeHandlers.Add(compiler.OpCodes.LoadPhi, (t, h, d, _) => 
+            vm.OpCodeHandlers.Add(compiler.OpCodes.EndFinally, (t, h, d, _) =>
             {
-                int tracker = 0;
-                // read temp reg
-                // store the metadata token for the active exception handler?
-                // TODO: or do I provide a random int in runtime exception handlers?
-                byte[] tempReg = t.ReadBytes(d, ref tracker, out int tempRegLength);
+                // TODO: stacked/nested finally clauses...?
 
-                ByteArrayKey tempRegKey = new ByteArrayKey(tempReg);
+                // Always use the leave offset that entered the finally, to leave the finally.
+                int offsetToLeaveTo = t.ActiveExceptionHandler.LeaveInstOffset;
 
-                // When someone wants to reference our current exception object, you need to know the local
-                // Look up the heap key for that local (register)
-                // Look up the value you retrieve as a byte array key in the object heap.
-                if (!h.ContainsKey(tempRegKey))
-                {
-                    h.Add(tempRegKey, t.ActiveExceptionHandler.ExceptionTypeObjectKey);
-                }
-                else
-                {
-                    h[tempRegKey] = t.ActiveExceptionHandler.ExceptionTypeObjectKey;
-                }
+                // Clean up current handler.
+                t.ActiveExceptionHandler = default;
 
-                return tracker;
+                return offsetToLeaveTo;
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, (t, h, d, _) =>
             {

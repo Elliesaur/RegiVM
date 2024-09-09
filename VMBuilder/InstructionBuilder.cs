@@ -20,8 +20,6 @@ namespace RegiVM.VMBuilder
         private readonly Dictionary<int, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<int, Tuple<int, int>>();
         private readonly List<int> _usedInstructionIndexes = new List<int>();
 
-        // TODO: Store another dictionary that contains block to handler mapping. 
-
         public InstructionBuilder()
         {
         }

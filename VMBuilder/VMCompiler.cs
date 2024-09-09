@@ -98,6 +98,7 @@ namespace RegiVM.VMBuilder
         {
             // TODO: Sort out concurrency issues.
             // Pass as param for AST visitor?
+
             CurrentMethod = method;
 
             var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);

@@ -127,11 +127,11 @@ namespace RegiVM.VMRuntime
                         {
                             ActiveExceptionHandler = handler;
 
-                            // Set IP to handler start?
+                            // Set IP to handler start
                             ip = handler.HandlerOffsetStart;
 
-                            // LOAD_PHI <TEMP_PHI>
-                            // STORE_LOCAL <REG> <TEMP_PHI>
+                            // We want to load the object into the heap for objects and make sure the exception handler
+                            // knows what to do with the exception type object key.
                             ByteArrayKey handlerKey = new ByteArrayKey(handler.ExceptionTypeObjectKey);
 
                             if (!ObjectHeap.ContainsKey(handlerKey))
@@ -144,13 +144,6 @@ namespace RegiVM.VMRuntime
                             }
 
                             isHandled = true;
-
-                            // Make sure we clear the exception handlers for the same protected block...
-                            var sameRegionHandlers = ExceptionHandlers.items.Where(x => x.Id == ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
-                            foreach (var sameRegionHandler in sameRegionHandlers.ToList())
-                            {
-                                ExceptionHandlers.Remove(sameRegionHandler);
-                            }
 
                             break;
                         }
