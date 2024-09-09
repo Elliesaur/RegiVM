@@ -1,5 +1,5 @@
 # RegiVM
-- Some crap VM that Ellie came up with one day and thought "why not try make one?".
+- Supports basic operations and exception handling.
 - Somewhat-register-based VM?
 - OpCodes are ulong.
 - Operands are byte arrays of any length.
@@ -19,7 +19,6 @@
 ![VsDebugConsole_z6IJU08MBJ](https://github.com/user-attachments/assets/a1249f2c-3513-4497-9cd9-3d38fab1c7d9)
 - This shows the OpCode and the Operand values. 
 - R is a register and T is a temporary register.
-
 
 ## But how does it make my closed-source obfuscator better?
 - It does not.
@@ -46,7 +45,9 @@ This is very basic for now.
 - RET `<register>`
 
 ## Control Flow
-- JUMP_BOOL `<offset-to-jump-to> <should-invert> <reg-to-check-for-boolean>` (for all branches)
+- JUMP_BOOL `<offset-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches)
+- END_FINALLY
+- START_BLOCK `<handlers-as-objects>`
 
 ## Maths
 - ADD `<data-type> <register-to-save-to> <register-1> <register-2>`
