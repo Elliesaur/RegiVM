@@ -105,6 +105,65 @@ namespace RegiVM
             }
             return d;
         }
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static int Math6(int arg1, int arg2)
+        {
+            try
+            {
+            a:
+                int d = arg1;
+                d = d - arg2;
+                if (d == 0)
+                {
+                    goto a;
+                }
+                if (d != 34)
+                {
+                    d = 600;
+                }
+                else
+                {
+                    d = 500;
+                }
+                try
+                {
+                    d = d / 0;
+                    // exception happens
+                    // -> push to the handler.
+                    d = d + 5;
+                }
+                catch (DivideByZeroException e)
+                {
+                    // value pushed by the CLR that contains object reference for the exception just thrown.
+                    // <>
+                    // stloc <e>
+                    d = d / 1;
+                }
+                catch (ArgumentOutOfRangeException f)
+                {
+                    d = d / 2;
+                }
+                catch (Exception g)
+                {
+                    d = d / 3;
+                }
+                finally
+                {
+                    d = d + 100;
+                    arg2 = arg2 / 0;
+                }
+                return d;
+            }
+            catch
+            {
+                return 400;
+            }
+            finally
+            {
+                arg1 = 0;
+                arg2 = 0;
+            }
+        }
     }
 
     public class Program
@@ -114,7 +173,7 @@ namespace RegiVM
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Math5");
+            var testMd = testType.Methods.First(x => x.Name == "Math6");
             //var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
             //testMd.CilMethodBody = new CilMethodBody(testMd);
             //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
@@ -475,7 +534,7 @@ namespace RegiVM
                     }
                 }
 
-                else if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+                if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
                 {
                     // Is finally instruction.
                     var finallyClause = t.ExceptionHandlers.Pop();
@@ -591,7 +650,7 @@ namespace RegiVM
             });
 
 
-            var actualResult = TestProgram.Math5(50, 60);
+            var actualResult = TestProgram.Math6(50, 60);
             Console.WriteLine(actualResult);
 
             vm.Run();

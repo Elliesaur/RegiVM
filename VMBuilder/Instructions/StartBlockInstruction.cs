@@ -61,6 +61,8 @@ namespace RegiVM.VMBuilder.Instructions
         public VMBlockType BlockType { get; }
         public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
 
+        public static int ExceptionHandlerIdentifier = 0;
+
         public StartBlockInstruction(VMCompiler compiler, IList<HandlerClause<CilInstruction>> handlers, VMBlockType blockType)
         {
             Registers = compiler.RegisterHelper;

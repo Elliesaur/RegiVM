@@ -54,8 +54,15 @@ This is very basic for now.
 - Repeat for SUB, MUL, DIV, XOR, AND, OR
 
 # TODO
-- [ ] Refine try/catch to support handlers without exception types.
-- [ ] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
+- [X] Refine try/catch to support handlers without exception types.
+- [X] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
+- [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
+- [ ] Add support for storing into parameters (starg).
+- [ ] Add support for new objects.
+- [ ] Add support for throwing exceptions.
+- [ ] Add support for converting between number data types (conv...).
+- [ ] Additional testing for exception handlers.
+- [ ] Add support for calling basic methods (both definition and references) with arbitrary number of arguments (use registers).
 
 # Dependencies
 - The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).

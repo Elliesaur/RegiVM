@@ -168,7 +168,7 @@ namespace RegiVM.VMBuilder
                     }
                     if (tries >= 5)
                     {
-                        throw new Exception("Cannot process handler start. No target found.");
+                        throw new Exception("Cannot process filter start. No target found.");
                     }
                     vmHandler.FilterIndexStart = InstructionBuilder.InstructionToOffset(filterStartInst);
                     InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart);
@@ -180,7 +180,7 @@ namespace RegiVM.VMBuilder
                 vmHandler.TryOffsetStart = handler.TryStart!.Offset;
                 vmHandler.TryOffsetEnd = handler.TryEnd!.Offset;
 
-                var sameRegionProtectedHandlers = results
+                var sameRegionProtectedHandlers = (ExceptionHandlers.Count == 0 ? results : ExceptionHandlers)
                     .Where(x => x.TryOffsetStart == vmHandler.TryOffsetStart && 
                         x.TryOffsetEnd == vmHandler.TryOffsetEnd);
                 if (sameRegionProtectedHandlers.Any())

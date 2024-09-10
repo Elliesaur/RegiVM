@@ -123,7 +123,7 @@ namespace RegiVM.VMRuntime
 
                     if (handler.Type == VMBlockType.Exception)
                     {
-                        if (handler.ExceptionType.IsAssignableFrom(vmException.GetType()))
+                        if (handler.ExceptionType != null && handler.ExceptionType.IsAssignableFrom(vmException.GetType()))
                         {
                             ActiveExceptionHandler = handler;
 
@@ -142,6 +142,17 @@ namespace RegiVM.VMRuntime
                             {
                                 ObjectHeap[handlerKey] = vmException;
                             }
+
+                            isHandled = true;
+
+                            break;
+                        }
+                        else if (handler.ExceptionType == null)
+                        {
+                            ActiveExceptionHandler = handler;
+
+                            // Set IP to handler start
+                            ip = handler.HandlerOffsetStart;
 
                             isHandled = true;
 

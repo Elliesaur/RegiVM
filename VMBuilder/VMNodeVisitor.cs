@@ -409,24 +409,37 @@ namespace RegiVM.VMBuilder
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
                         {
-                            // We always order by the handler type descending because this puts finally ahead of exception.
-                            // We want them to be on the earliest try that they are within.
-                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
-                                .OrderByDescending(x => x.HandlerType)
-                                .ThenBy(x => x.TryStart?.Offset))
+                            var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
+                            var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
+                            if (isInSame)
                             {
-                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
-                                {
-                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
-                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
-                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
+                                // No need to compute, in same handler.
+                            }
+                            else
+                            {
+                                var closest = handlersForThis.FindClosest(instTarget);
+                                // Just use closest.
+                                position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
 
-                                    if (vmHandler.TryOffsetStart >= 0)
-                                    {
-                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
-                                        break;
-                                    }
-                                }
+                                // We always order by the handler type descending because this puts finally ahead of exception.
+                                // We want them to be on the earliest try that they are within.
+                                //foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                //    .OrderByDescending(x => x.HandlerType)
+                                //    .ThenBy(x => x.TryStart?.Offset))
+                                //{
+                                //    if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                //    {
+                                //        var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                //            x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                //            x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                //        if (vmHandler.TryOffsetStart >= 0)
+                                //        {
+                                //            position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                //            break;
+                                //        }
+                                //    }
+                                //}
                             }
                         }
 
@@ -515,25 +528,40 @@ namespace RegiVM.VMBuilder
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
                         {
-                            // We always order by the handler type descending because this puts finally ahead of exception.
-                            // We want them to be on the earliest try that they are within.
-                            foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
-                                .OrderByDescending(x => x.HandlerType)
-                                .ThenBy(x => x.TryStart?.Offset))
+                            var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
+                            var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
+                            if (isInSame)
                             {
-                                if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
-                                {
-                                    var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
-                                        x.TryOffsetEnd == ex.TryEnd!.Offset &&
-                                        x.Type == ex.HandlerType.ToVMBlockHandlerType());
-
-                                    if (vmHandler.TryOffsetStart >= 0)
-                                    {
-                                        position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
-                                        break;
-                                    }
-                                }
+                                // Same area, no need to compute.
                             }
+                            else
+                            {
+                                var closest = handlersForThis.FindClosest(instTarget);
+                                // Just use closest.
+                                position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
+
+                                //// Different area, need to compute.
+                                //// We always order by the handler type descending because this puts finally ahead of exception.
+                                //// We want them to be on the earliest try that they are within.
+                                //foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
+                                //    .OrderByDescending(x => x.HandlerType)
+                                //    .ThenBy(x => x.TryStart?.Offset))
+                                //{
+                                //    if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
+                                //    {
+                                //        var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
+                                //            x.TryOffsetEnd == ex.TryEnd!.Offset &&
+                                //            x.Type == ex.HandlerType.ToVMBlockHandlerType());
+
+                                //        if (vmHandler.TryOffsetStart >= 0)
+                                //        {
+                                //            position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
+                                //            break;
+                                //        }
+                                //    }
+                                //}
+                            }
+                            
                         }
                         
                         state.InstructionBuilder.AddUsedMapping(position);
