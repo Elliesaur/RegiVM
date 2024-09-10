@@ -528,7 +528,7 @@ namespace RegiVM
                     }
                     t.ActiveExceptionHandler = default;
 
-                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
+                    if (shouldBranch)
                     {
                         tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
                     }
@@ -550,9 +550,55 @@ namespace RegiVM
                 }
                 else
                 {
-                    if (!shouldInvert && shouldBranch || shouldInvert && !shouldBranch)
+                    if (!shouldInvert && shouldBranch)
                     {
                         tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                    else if (shouldInvert)
+                    {
+                        try
+                        {
+                            switch (h[shouldBranchReg].Length)
+                            {
+                                // Bool, if it is false, branch, if true, do not branch.
+                                case 1:
+                                    if (!shouldBranch)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                                case 2:
+                                    Int16 tmp3 = (Int16)t.GetNumberObject(DataType.Int16, h[shouldBranchReg]);
+                                    if (tmp3 == (Int16)0)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                                case 4:
+                                    Double tmp1 = Convert.ToDouble(t.GetNumberObject(DataType.Int32, h[shouldBranchReg]));
+                                    if (tmp1 == 0.0d)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                                case 8:
+                                    Double tmp2 = Convert.ToDouble(t.GetNumberObject(DataType.Int64, h[shouldBranchReg]));
+                                    if (tmp2 == 0.0d)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                            }
+                        }
+                        catch (OverflowException)
+                        {
+                            switch (h[shouldBranchReg].Length)
+                            {
+                                case 4:
+                                    UInt32 tmp1 = (UInt32)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
+                                    if (tmp1 == 0U)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                                case 8:
+                                    UInt64 tmp2 = (UInt64)t.GetNumberObject(DataType.UInt64, h[shouldBranchReg]);
+                                    if (tmp2 == 0UL)
+                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                                    break;
+                            }
+                        }
+                        
                     }
                 }
                 
@@ -621,7 +667,7 @@ namespace RegiVM
             });
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, (t, h, d, _) =>
             {
-                // CEQ/CLT/CGT 
+                // CEQ/CLT/CGT and branch equivs.
                 int tracker = 0;
 
                 ComparatorType compareType = t.ReadComparatorType(d, ref tracker);

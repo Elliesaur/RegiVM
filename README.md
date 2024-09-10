@@ -531,6 +531,16 @@ This is very basic for now, more will be added in time.
 - ceq
 - clt
 - cgt
+- beq
+- bne.un
+- bge
+- bgt
+- bgt.un
+- bge.un
+- ble
+- blt
+- blt.un
+- ble.un
 - nop (not supported, never will be)
   
 # TODO

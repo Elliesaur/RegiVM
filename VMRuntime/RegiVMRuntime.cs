@@ -257,10 +257,15 @@ namespace RegiVM.VMRuntime
             {
                 ComparatorType.IsEqual => leftObjD == rightObjD,
                 ComparatorType.IsNotEqual => leftObjD != rightObjD,
+                ComparatorType.IsNotEqualUnsignedUnordered => leftObjD != rightObjD,
                 ComparatorType.IsGreaterThan => leftObjD > rightObjD,
+                ComparatorType.IsGreaterThanUnsignedUnordered => leftObjD > rightObjD,
                 ComparatorType.IsGreaterThanOrEqual => leftObjD >= rightObjD,
+                ComparatorType.IsGreaterThanOrEqualUnsignedUnordered => leftObjD >= rightObjD,
                 ComparatorType.IsLessThan => leftObjD < rightObjD,
+                ComparatorType.IsLessThanUnsignedUnordered => leftObjD < rightObjD,
                 ComparatorType.IsLessThanOrEqual => leftObjD <= rightObjD,
+                ComparatorType.IsLessThanOrEqualUnsignedUnordered => leftObjD <= rightObjD,
             };
             return [(byte)(result ? 1 : 0)];
             //}

@@ -171,6 +171,21 @@ namespace RegiVM.VMBuilder
                         {
                             throw new Exception("Unconditional branch with stack values??");
                         }
+                        switch (inst.OpCode.Code)
+                        {
+                            case CilCode.Beq:
+                            case CilCode.Bne_Un:
+                            case CilCode.Bge:
+                            case CilCode.Bgt:
+                            case CilCode.Bgt_Un:
+                            case CilCode.Bge_Un:
+                            case CilCode.Ble:
+                            case CilCode.Blt:
+                            case CilCode.Blt_Un:
+                            case CilCode.Ble_Un:
+                                state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst);
+                                break;
+                        }
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
                     }
 
@@ -394,15 +409,50 @@ namespace RegiVM.VMBuilder
                         {
                             throw new Exception("Cannot process branch target. No target found.");
                         }
+                        
+                        // TODO: Check Beq/Ble/Blt/Bge/bgt/Bne...
+                        // Release compiles will use it.
 
                         if (inst.IsUnconditionalBranch())
                         {
                             throw new Exception("Unconditional branch with stack values??");
                         }
-                        else if (inst.IsConditionalBranch())
+                        
+                        switch (inst.OpCode.Code)
                         {
-                            // Technically there should be something already on the stack??
+                            case CilCode.Beq:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsEqual), inst);
+                                break;
+                            case CilCode.Bne_Un:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsNotEqualUnsignedUnordered), inst);
+                                break;
+                            case CilCode.Bge:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqual), inst);
+                                break;
+                            case CilCode.Bgt:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThan), inst);
+                                break;
+                            case CilCode.Bgt_Un:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanUnsignedUnordered), inst);
+                                break;
+                            case CilCode.Bge_Un:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqualUnsignedUnordered), inst);
+                                break;
+
+                            case CilCode.Ble:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqual), inst);
+                                break;
+                            case CilCode.Blt:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThan), inst);
+                                break;
+                            case CilCode.Blt_Un:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanUnsignedUnordered), inst);
+                                break;
+                            case CilCode.Ble_Un:
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqualUnsignedUnordered), inst);
+                                break;
                         }
+
 
                         int position = state.InstructionBuilder.InstructionToOffset(instTarget);
 
@@ -411,35 +461,15 @@ namespace RegiVM.VMBuilder
                         {
                             var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
                             var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
-                            if (isInSame)
-                            {
-                                // No need to compute, in same handler.
-                            }
-                            else
+                            if (!isInSame)
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
                                 position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
-
-                                // We always order by the handler type descending because this puts finally ahead of exception.
-                                // We want them to be on the earliest try that they are within.
-                                //foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
-                                //    .OrderByDescending(x => x.HandlerType)
-                                //    .ThenBy(x => x.TryStart?.Offset))
-                                //{
-                                //    if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
-                                //    {
-                                //        var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
-                                //            x.TryOffsetEnd == ex.TryEnd!.Offset &&
-                                //            x.Type == ex.HandlerType.ToVMBlockHandlerType());
-
-                                //        if (vmHandler.TryOffsetStart >= 0)
-                                //        {
-                                //            position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
-                                //            break;
-                                //        }
-                                //    }
-                                //}
+                            }
+                            else
+                            {
+                                // No need to compute, in same handler.
                             }
                         }
 
@@ -447,8 +477,6 @@ namespace RegiVM.VMBuilder
 
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
-
-                        // There is no register for this operation, leave it null.
                     }
 
                     return null!;
@@ -530,38 +558,17 @@ namespace RegiVM.VMBuilder
                         {
                             var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
                             var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
-                            if (isInSame)
-                            {
-                                // Same area, no need to compute.
-                            }
-                            else
+                            if (!isInSame)
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
                                 position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
-
-                                //// Different area, need to compute.
-                                //// We always order by the handler type descending because this puts finally ahead of exception.
-                                //// We want them to be on the earliest try that they are within.
-                                //foreach (var ex in state.CurrentMethod.CilMethodBody!.ExceptionHandlers
-                                //    .OrderByDescending(x => x.HandlerType)
-                                //    .ThenBy(x => x.TryStart?.Offset))
-                                //{
-                                //    if (ex.TryStart!.Offset <= instTarget.Offset && ex.TryEnd!.Offset >= instTarget.Offset)
-                                //    {
-                                //        var vmHandler = state.ExceptionHandlers.FirstOrDefault(x => x.TryOffsetStart == ex.TryStart!.Offset &&
-                                //            x.TryOffsetEnd == ex.TryEnd!.Offset &&
-                                //            x.Type == ex.HandlerType.ToVMBlockHandlerType());
-
-                                //        if (vmHandler.TryOffsetStart >= 0)
-                                //        {
-                                //            position = state.InstructionBuilder.InstructionToOffset(vmHandler.PlaceholderStartInstruction);
-                                //            break;
-                                //        }
-                                //    }
-                                //}
                             }
-                            
+                            else
+                            {
+                                // Same area, no need to compute.
+                            }
+
                         }
                         
                         state.InstructionBuilder.AddUsedMapping(position);
