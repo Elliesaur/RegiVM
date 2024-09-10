@@ -53,6 +53,10 @@ This is very basic for now.
 - ADD `<data-type> <register-to-save-to> <register-1> <register-2>`
 - Repeat for SUB, MUL, DIV, XOR, AND, OR
 
+# TODO
+- [ ] Refine try/catch to support handlers without exception types.
+- [ ] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
+
 # Dependencies
 - The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).
 - The even lovelier [Echo](https://github.com/Washi1337/Echo) (which currently isn't used to its full potential... >:c).
