@@ -489,8 +489,8 @@ RETURN T(T54)
 - Yeah, it doesn't support every operation.
 - Open an issue, make a PR, be a *developer*.
 
-# Operands/OpCodes
-This is very basic for now.
+# OpCodes/Operands for RegiVM
+This is very basic for now, more will be added in time.
 
 ## Working with Data
 - NUMBER `<data-type> <register-to-save-to> <value>`
@@ -509,6 +509,30 @@ This is very basic for now.
 - ADD `<data-type> <register-to-save-to> <register-1> <register-2>`
 - Repeat for SUB, MUL, DIV, XOR, AND, OR
 
+
+## .NET IL OpCodes Supported by RegiVM
+- add
+- sub
+- xor
+- or
+- and
+- div
+- mul
+- ldc.i4
+- ldarg
+- ldloc
+- stloc
+- brfalse
+- brtrue
+- br
+- leave
+- endfinally
+- ret
+- ceq
+- clt
+- cgt
+- nop (not supported, never will be)
+  
 # TODO
 - [X] Refine try/catch to support handlers without exception types.
 - [X] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
