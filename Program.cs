@@ -517,6 +517,45 @@ namespace RegiVM
 
                 // Should this branch happen?
                 bool shouldBranch = h[shouldBranchReg][0] == 1 ? true : false;
+                bool isZero = false;
+                bool isNull = false; // TODO: Support objects.
+                bool isBool = false;
+                try
+                {
+                    switch (h[shouldBranchReg].Length)
+                    {
+                        case 1:
+                            isZero = h[shouldBranchReg][0] == 0;
+                            isBool = true;
+                            break;
+                        case 2:
+                            Int16 tmp3 = (Int16)t.GetNumberObject(DataType.Int16, h[shouldBranchReg]);
+                            isZero = tmp3 == (Int16)0;
+                            break;
+                        case 4:
+                            Double tmp1 = Convert.ToDouble(t.GetNumberObject(DataType.Int32, h[shouldBranchReg]));
+                            isZero = tmp1 == 0.0d;
+                            break;
+                        case 8:
+                            Double tmp2 = Convert.ToDouble(t.GetNumberObject(DataType.Int64, h[shouldBranchReg]));
+                            isZero = tmp2 == 0.0d;
+                            break;
+                    }
+                }
+                catch (OverflowException)
+                {
+                    switch (h[shouldBranchReg].Length)
+                    {
+                        case 4:
+                            UInt32 tmp1 = (UInt32)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
+                            isZero = tmp1 == 0U;
+                            break;
+                        case 8:
+                            UInt64 tmp2 = (UInt64)t.GetNumberObject(DataType.UInt64, h[shouldBranchReg]);
+                            isZero = tmp2 == 0UL;
+                            break;
+                    }
+                }
 
                 if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
@@ -550,56 +589,25 @@ namespace RegiVM
                 }
                 else
                 {
-                    if (!shouldInvert && shouldBranch)
+                    if (!shouldInvert && !isZero)
                     {
                         tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
                     }
-                    else if (shouldInvert)
+                    else if (!shouldInvert && shouldBranch && isBool)
                     {
-                        try
-                        {
-                            switch (h[shouldBranchReg].Length)
-                            {
-                                // Bool, if it is false, branch, if true, do not branch.
-                                case 1:
-                                    if (!shouldBranch)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                                case 2:
-                                    Int16 tmp3 = (Int16)t.GetNumberObject(DataType.Int16, h[shouldBranchReg]);
-                                    if (tmp3 == (Int16)0)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                                case 4:
-                                    Double tmp1 = Convert.ToDouble(t.GetNumberObject(DataType.Int32, h[shouldBranchReg]));
-                                    if (tmp1 == 0.0d)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                                case 8:
-                                    Double tmp2 = Convert.ToDouble(t.GetNumberObject(DataType.Int64, h[shouldBranchReg]));
-                                    if (tmp2 == 0.0d)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                            }
-                        }
-                        catch (OverflowException)
-                        {
-                            switch (h[shouldBranchReg].Length)
-                            {
-                                case 4:
-                                    UInt32 tmp1 = (UInt32)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
-                                    if (tmp1 == 0U)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                                case 8:
-                                    UInt64 tmp2 = (UInt64)t.GetNumberObject(DataType.UInt64, h[shouldBranchReg]);
-                                    if (tmp2 == 0UL)
-                                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                                    break;
-                            }
-                        }
-                        
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
                     }
+                    // TODO: Add is "not null" for brtrue support. 
+
+                    if (shouldInvert && isZero)
+                    {
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                    else if (shouldInvert && !shouldBranch && isBool)
+                    {
+                        tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    }
+                    // TODO: Add is "null" for brfalse support.
                 }
                 
                 return tracker;
