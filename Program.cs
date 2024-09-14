@@ -2,27 +2,48 @@
 using RegiVM.VMBuilder;
 using RegiVM.VMRuntime;
 using RegiVM.VMRuntime.Handlers;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using static RegiVM.VMRuntime.RegiVMRuntime;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RegiVM
 {
     public static class Program
     {
+        internal static ByteArrayKey GetKey(this ulong val)
+        {
+            return new ByteArrayKey(BitConverter.GetBytes(val));
+        }
         public static void Main(string[] args)
         {
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
+            //ActionDictionary<ulong> hello = new ActionDictionary<ulong>(10);
+            //hello.Add(1, InstructionHandlers.Add);
+            //hello.Add(2, InstructionHandlers.Sub);
+            //hello.Add(3, InstructionHandlers.Mul);
+            //hello.Add(4, InstructionHandlers.Div);
+            //hello.Add(5, InstructionHandlers.JumpBool);
+            //hello.Add(6, InstructionHandlers.Endfinally);
+            //hello.Add(7, InstructionHandlers.Comparator);
+            //hello.Add(8, InstructionHandlers.LoadOrStoreRegister);
+            //hello.Add(9, InstructionHandlers.Xor);
+            //hello.Add(10, InstructionHandlers.And);
+            //hello.Add(11, InstructionHandlers.Or);
+            //sw.Stop();
+            //Console.WriteLine(sw.ToString());
+            //sw.Reset();
+            //sw.Start();
+            //ActionDelegate test = hello[10];
+            //sw.Stop();
+            //Console.WriteLine(sw.ToString());
+
+            //return;
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
             var testMd = testType.Methods.First(x => x.Name == "Math7");
-            //var testMd = new MethodDefinition("IDGAF", MethodAttributes.Public, new MethodSignature(CallingConventionAttributes.Default, module.CorLibTypeFactory.Int32, new List<TypeSignature>()));
-            //testMd.CilMethodBody = new CilMethodBody(testMd);
-            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(1));
-            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(2));
-            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
-            //testMd.CilMethodBody.Instructions.Add(CilInstruction.CreateLdcI4(3));
-            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Add));
-            //testMd.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
-            //testMd.CilMethodBody.Instructions.CalculateOffsets();
-            //testMd.CilMethodBody.ComputeMaxStack();
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
@@ -49,6 +70,7 @@ namespace RegiVM
             vm.OpCodeHandlers.Add(compiler.OpCodes.StartRegionBlock, InstructionHandlers.StartRegionBlock);
             vm.OpCodeHandlers.Add(compiler.OpCodes.EndFinally, InstructionHandlers.Endfinally);
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, InstructionHandlers.Comparator);
+
 
             var actualResult = TestProgram.Math7(50, 60);
             Console.WriteLine(actualResult);

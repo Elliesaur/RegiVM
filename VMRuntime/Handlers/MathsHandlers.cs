@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime;
-using static RegiVM.VMRuntime.RegiVMRuntime;
 
 namespace RegiVM.VMRuntime.Handlers
 {

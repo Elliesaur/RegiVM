@@ -1,7 +1,6 @@
 ﻿using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
-using RegiVM.VMRuntime;
-using static RegiVM.VMRuntime.RegiVMRuntime;
+using System.Diagnostics;
 
 namespace RegiVM.VMRuntime.Handlers
 {
@@ -138,7 +137,14 @@ namespace RegiVM.VMRuntime.Handlers
             }
             else if (isLeaveProtected)
             {
-                throw new Exception("Is leave protected instruction jump, but there is no handler...?");
+                if (shouldBranch)
+                {
+                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                }
+                // TODO: Investigate why there is a leave when the finally has already been executed...
+                // - (hi weirdo person creeping github) C:\Users\ellie\Documents\ShareX\Screenshots\2024-09\dnSpy_WiQn3NKZsu.png
+                //Debugger.Break();
+                //throw new Exception("Is leave protected instruction jump, but there is no handler...?");
             }
             else
             {
