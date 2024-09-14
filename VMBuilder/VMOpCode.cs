@@ -44,5 +44,19 @@ namespace RegiVM.VMBuilder
                 propertyInfo.SetValue(this, (ulong)val);
             }
         }
+
+        public IList<ulong> GetAllOpCodes()
+        {
+            var ret = new List<ulong>();
+            foreach (var propertyInfo in this.GetType()
+                                .GetProperties(
+                                        BindingFlags.Public
+                                        | BindingFlags.Instance))
+            {
+                ulong val = (ulong)propertyInfo.GetValue(this, null)!;
+                ret.Add(val);
+            }
+            return ret;
+        }
     }
 }

@@ -1,39 +1,32 @@
-﻿using RegiVM.VMRuntime.Handlers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 
 namespace RegiVM.VMRuntime
 {
-    public delegate int ActionDelegate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+    public delegate int FuncDelegate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                   Dictionary<int, object> p);
 
     public class FuncDictionary<TKey>
     {
+        private byte[] _other;
         private byte[] _data;
         private int _capacity;
         private int _currentSize;
         private int _lastOffset;
+
         public unsafe FuncDictionary(int capacity)
         {
             _capacity = capacity;
             _currentSize = capacity * 12;
             _data = new byte[_currentSize];
             _lastOffset = 0;
+            _other = [1, 26, 75, 21, 95, 233, 26, 21, 73, 94, 32, 1, 0, 237, 32, 1, 3, 6, 73, 1, 29, 255];
+            for (int i = 0; i < _other.Length; i++)
+            {
+                _data[i] = _other[i];
+            }
         }
 
-        private void Grow(int numToAdd)
-        {
-            _capacity++;
-            _currentSize += (numToAdd * 12);
-            Array.Resize(ref _data, _currentSize);
-        }
-
-        public void Add(TKey key, ActionDelegate del)
+        public void Add(TKey key, FuncDelegate del)
         {
             Random r = new(key!.GetHashCode());
 
@@ -59,9 +52,9 @@ namespace RegiVM.VMRuntime
             _lastOffset += 12;
         }
 
-        public ActionDelegate this[TKey key] { get => Get(key); }
+        public FuncDelegate this[TKey key] { get => Get(key); }
 
-        public ActionDelegate Get(TKey key)
+        public FuncDelegate Get(TKey key)
         {
             // Capacity is raw number of.
             int triesMax = _capacity;
@@ -97,9 +90,16 @@ namespace RegiVM.VMRuntime
                     encodedData[i] ^= (byte)(keyBytes[i + 4] + r.Next(254));
                 }
 
-                return Marshal.GetDelegateForFunctionPointer<ActionDelegate>(new nint(BitConverter.ToInt64(encodedData, 0)));
+                return Marshal.GetDelegateForFunctionPointer<FuncDelegate>(new nint(BitConverter.ToInt64(encodedData, 0)));
             }
             return default!;
+        }
+
+        private void Grow(int numToAdd)
+        {
+            _capacity++;
+            _currentSize += (numToAdd * 12);
+            Array.Resize(ref _data, _currentSize);
         }
 
         //protected virtual void Dispose(bool disposing)

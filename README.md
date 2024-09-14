@@ -501,14 +501,18 @@ This is very basic for now, more will be added in time.
 - RET `<register>`
 
 ## Control Flow
-- JUMP_BOOL `<offset-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches)
-- END_FINALLY
+- JUMP_BOOL `<offset(s)-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches, leaves, switches)
 - START_BLOCK `<handlers-as-objects>`
+- END_FINALLY
 
 ## Maths
 - ADD `<data-type> <register-to-save-to> <register-1> <register-2>`
-- Repeat for SUB, MUL, DIV, XOR, AND, OR
-
+- SUB `<data-type> <register-to-save-to> <register-1> <register-2>`
+- MUL `<data-type> <register-to-save-to> <register-1> <register-2>`
+- DIV `<data-type> <register-to-save-to> <register-1> <register-2>`
+- XOR `<data-type> <register-to-save-to> <register-1> <register-2>`
+- AND `<data-type> <register-to-save-to> <register-1> <register-2>`
+- OR `<data-type> <register-to-save-to> <register-1> <register-2>`
 
 ## .NET IL OpCodes Supported by RegiVM
 - add
@@ -541,11 +545,14 @@ This is very basic for now, more will be added in time.
 - blt
 - blt.un
 - ble.un
+- switch
 - nop (not supported, never will be)
   
 # TODO
 - [X] Refine try/catch to support handlers without exception types.
 - [X] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
+- [X] Add support for switch statements
+- [ ] Add support for calls and restructure VM runtime for jump to call support. Particularly, parameter offsets, returns and so on.
 - [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
 - [ ] Add support for storing into parameters (starg).
 - [ ] Add support for new objects.

@@ -55,9 +55,21 @@ namespace RegiVM.VMRuntime.Handlers
                                      Dictionary<int, object> _)
         {
             int tracker = 0;
-            // OFFSET?
-            int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            
+
+            int branchOffsetLength = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
             tracker += 4;
+
+            int[] jumpOffsets = new int[branchOffsetLength];
+            for (int i = 0; i < branchOffsetLength; i++)
+            {
+                jumpOffsets[i] = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                tracker += 4;
+            }
+
+
+            //int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            //tracker += 4;
 
             bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
             bool isLeaveProtected = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
@@ -109,64 +121,89 @@ namespace RegiVM.VMRuntime.Handlers
                 }
             }
 
-            if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
+            
+            if (jumpOffsets.Length > 1)
             {
-                // Make sure we clear the exception handlers for the same protected block...
-                var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == t.ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
-                foreach (var sameRegionHandler in sameRegionHandlers.ToList())
+                // Switch statement is possibly in the stack.
+                // We do not need to worry about control transfers into protected region blocks.
+                uint value = (uint)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
+                if (value < jumpOffsets.Length)
                 {
-                    t.ExceptionHandlers.Remove(sameRegionHandler);
+                    // ECMA: if value is less than n executio nis transferred to the valueths target.
+                    // value of 1 takes the second target, 0 takes the first target.
+                    var option = jumpOffsets[value];
+                    tracker = t.InstructionOffsetMappings[option].Item1;
+                    return tracker;
                 }
-                t.ActiveExceptionHandler = default;
-
-                if (shouldBranch)
+                else
                 {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    // Fallthrough if not less than n.
+                    return tracker;
                 }
-            }
-
-            if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
-            {
-                // Is finally instruction.
-                var finallyClause = t.ExceptionHandlers.Pop();
-                t.ActiveExceptionHandler = finallyClause;
-                tracker = finallyClause.HandlerOffsetStart;
-
-                // Store the active leave inst offset so we know where to go after the endfinally instruction.
-                t.ActiveExceptionHandler.LeaveInstOffset = t.InstructionOffsetMappings[branchToOffset].Item1;
-            }
-            else if (isLeaveProtected)
-            {
-                if (shouldBranch)
-                {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                }
-                // TODO: Investigate why there is a leave when the finally has already been executed...
-                // - (hi weirdo person creeping github) C:\Users\ellie\Documents\ShareX\Screenshots\2024-09\dnSpy_WiQn3NKZsu.png
-                //Debugger.Break();
-                //throw new Exception("Is leave protected instruction jump, but there is no handler...?");
             }
             else
             {
-                if (!shouldInvert && !isZero)
-                {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                }
-                else if (!shouldInvert && shouldBranch && isBool)
-                {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
-                }
-                // TODO: Add is "not null" for brtrue support. 
+                int branchToOffset = jumpOffsets[0];
+                int branchToOffsetValue = t.InstructionOffsetMappings[branchToOffset].Item1;
 
-                if (shouldInvert && isZero)
+                if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    // Make sure we clear the exception handlers for the same protected block...
+                    var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == t.ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
+                    foreach (var sameRegionHandler in sameRegionHandlers.ToList())
+                    {
+                        t.ExceptionHandlers.Remove(sameRegionHandler);
+                    }
+                    t.ActiveExceptionHandler = default;
+
+                    if (shouldBranch)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
                 }
-                else if (shouldInvert && !shouldBranch && isBool)
+
+                if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
                 {
-                    tracker = t.InstructionOffsetMappings[branchToOffset].Item1;
+                    // Is finally instruction.
+                    var finallyClause = t.ExceptionHandlers.Pop();
+                    t.ActiveExceptionHandler = finallyClause;
+                    tracker = finallyClause.HandlerOffsetStart;
+
+                    // Store the active leave inst offset so we know where to go after the endfinally instruction.
+                    t.ActiveExceptionHandler.LeaveInstOffset = branchToOffsetValue;
                 }
-                // TODO: Add is "null" for brfalse support.
+                else if (isLeaveProtected)
+                {
+                    if (shouldBranch)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
+                    // TODO: Investigate why there is a leave when the finally has already been executed...
+                    // - (hi weirdo person creeping github) C:\Users\ellie\Documents\ShareX\Screenshots\2024-09\dnSpy_WiQn3NKZsu.png
+                    //throw new Exception("Is leave protected instruction jump, but there is no handler...?");
+                }
+                else
+                {
+                    if (!shouldInvert && !isZero)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
+                    else if (!shouldInvert && shouldBranch && isBool)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
+                    // TODO: Add is "not null" for brtrue support. 
+
+                    if (shouldInvert && isZero)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
+                    else if (shouldInvert && !shouldBranch && isBool)
+                    {
+                        tracker = branchToOffsetValue;
+                    }
+                    // TODO: Add is "null" for brfalse support.
+                }
             }
 
             return tracker;

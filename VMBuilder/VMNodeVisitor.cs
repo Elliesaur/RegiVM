@@ -165,7 +165,7 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst);
                     }
-                    if (inst.IsBranch())
+                    if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
                         if (inst.IsUnconditionalBranch())
                         {
@@ -188,7 +188,10 @@ namespace RegiVM.VMBuilder
                         }
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
                     }
-
+                    if (inst.OpCode.Code == CilCode.Switch)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
+                    }
                 }
                 else
                 {
@@ -200,6 +203,10 @@ namespace RegiVM.VMBuilder
                     if (inst.OpCode.Code == CilCode.Ldstr)
                     {
                         //state.InstructionBuilder.AddDryPass(state.OpCodes.StringLoad, inst);
+                    }
+                    if (inst.OpCode.Code == CilCode.Ret)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst);
                     }
                     if (inst.IsLdloc())
                     {
@@ -454,7 +461,7 @@ namespace RegiVM.VMBuilder
                         }
 
 
-                        int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+                        int position = state.InstructionBuilder.InstructionToIndex(instTarget);
 
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
@@ -465,22 +472,50 @@ namespace RegiVM.VMBuilder
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
-                                position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
+                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction);
                             }
                             else
                             {
                                 // No need to compute, in same handler.
                             }
                         }
-
+                        if (position < 0)
+                        {
+                            throw new Exception("Position cannot be below zero.");
+                        }
                         state.InstructionBuilder.AddUsedMapping(position);
 
-                        var brInst = new JumpBoolInstruction(state, position, inst);
+                        var brInst = new JumpBoolInstruction(state, inst, position);
                         state.InstructionBuilder.Add(brInst, inst);
                     }
                     if (inst.OpCode.Code == CilCode.Switch)
                     {
-                        var x = inst.Operand as IList<CilInstructionLabel>;
+                        var switchLabels = (List<ICilLabel>)inst.Operand!;
+                        var offsets = new List<int>();
+                        foreach (var sw in switchLabels.Cast<CilInstructionLabel>())
+                        {
+                            // Add each offset position.
+                            var instTarget = sw.Instruction!;
+                            var indexOfInstruction = state.CurrentMethod.CilMethodBody!.Instructions.IndexOf(instTarget);
+                            var tries = 0;
+                            while (!state.InstructionBuilder.IsValidOpCode(instTarget.OpCode.Code) && tries++ < 5)
+                            {
+                                instTarget = state.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                            }
+                            if (tries >= 5)
+                            {
+                                throw new Exception("Cannot process branch target. No target found.");
+                            }
+                            int position = state.InstructionBuilder.InstructionToIndex(instTarget);
+                            if (position < 0)
+                            {
+                                throw new Exception("Position cannot be below zero.");
+                            }
+                            state.InstructionBuilder.AddUsedMapping(position);
+                            offsets.Add(position);
+                        }
+                        var switchInst = new JumpBoolInstruction(state, inst, offsets.ToArray());
+                        state.InstructionBuilder.Add(switchInst, inst);
                     }
                     return null!;
                 }
@@ -523,6 +558,11 @@ namespace RegiVM.VMBuilder
                         reg = ldargInst.TempReg1;
 
                     }
+                    if (inst.OpCode.Code == CilCode.Ret)
+                    {
+                        var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
+                        state.InstructionBuilder.Add(retInst, inst);
+                    }
                     // TODO: Endfilter at some point?
                     if (inst.OpCode.Code == CilCode.Endfinally)
                     {
@@ -554,7 +594,7 @@ namespace RegiVM.VMBuilder
                             // Technically there should be something already on the stack??
                         }
 
-                        int position = state.InstructionBuilder.InstructionToOffset(instTarget);
+                        int position = state.InstructionBuilder.InstructionToIndex(instTarget);
 
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
@@ -565,7 +605,7 @@ namespace RegiVM.VMBuilder
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
-                                position = state.InstructionBuilder.InstructionToOffset(closest.Item2.PlaceholderStartInstruction);
+                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction);
                             }
                             else
                             {
@@ -573,10 +613,13 @@ namespace RegiVM.VMBuilder
                             }
 
                         }
-                        
+                        if (position < 0)
+                        {
+                            throw new Exception("Position cannot be below zero.");
+                        }
                         state.InstructionBuilder.AddUsedMapping(position);
 
-                        var brInst = new JumpBoolInstruction(state, position, inst);
+                        var brInst = new JumpBoolInstruction(state, inst, position);
                         state.InstructionBuilder.Add(brInst, inst);
 
                         // There is no register for this operation, leave it null.

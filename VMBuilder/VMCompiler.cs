@@ -155,7 +155,7 @@ namespace RegiVM.VMBuilder
                     {
                         throw new Exception("Cannot process handler start. No target found.");
                     }
-                    vmHandler.HandlerIndexStart = InstructionBuilder.InstructionToOffset(handlerStartInst);
+                    vmHandler.HandlerIndexStart = InstructionBuilder.InstructionToIndex(handlerStartInst);
                     InstructionBuilder.AddUsedMapping(vmHandler.HandlerIndexStart);
                 }
                 if (filterStartInst != null)
@@ -170,7 +170,7 @@ namespace RegiVM.VMBuilder
                     {
                         throw new Exception("Cannot process filter start. No target found.");
                     }
-                    vmHandler.FilterIndexStart = InstructionBuilder.InstructionToOffset(filterStartInst);
+                    vmHandler.FilterIndexStart = InstructionBuilder.InstructionToIndex(filterStartInst);
                     InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart);
                 }
                 if (handler.ExceptionType != null)

@@ -5,6 +5,28 @@ namespace RegiVM
     internal static class TestProgram
     {
 
+        public static void Switch1(int argument1, int argument2)
+        {
+            var test = argument1 switch
+            {
+                1 => argument2 * 1,
+                3 => argument2 * 4,
+                49 => argument1 * 10,
+                5 => argument2 * 5,
+                7 => argument2 * 7,
+                9 => argument2 * 9,
+                10 => argument2 * 10,
+                11 => argument2 * 11,
+                12 => argument2 * 12,
+                13 => argument2 * 13,
+                14 => argument2 * 14,
+            };
+            if (test == 0)
+            {
+                return;
+            }
+        }
+
         public static int Math1()
         {
             // Load to local var.
@@ -167,6 +189,7 @@ namespace RegiVM
                 int x = -10;
                 int d = arg1;
                 d = d - arg2;
+                //d = Math2(arg1, arg2);
                 if (d == 0)
                 {
                     goto a;
@@ -234,6 +257,88 @@ namespace RegiVM
                 return 6700;
             }
             finally 
+            {
+                arg1 = 0;
+                arg2 = 0;
+            }
+        }
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static int Math8(int arg1, int arg2)
+        {
+            try
+            {
+            a:
+                int x = -10;
+                int d = arg1;
+                d = d - arg2;
+                d = Math2(arg1, arg2);
+                if (d == 0)
+                {
+                    goto a;
+                }
+                switch (d)
+                {
+                    case 30:
+                    case 35:
+                    case 37:
+                        x = 10;
+                        d = 10;
+                        break;
+                    case 40:
+                        x = 20;
+                        break;
+                    case 50:
+                    case 60:
+                        x = 30;
+                        d = 30;
+                        break;
+                    default:
+                        x = 40;
+                        break;
+                }
+                if (d != 34)
+                {
+                    d = 600;
+                }
+                else
+                {
+                    d = 500;
+                }
+                try
+                {
+                    d = d / 0;
+                    // exception happens
+                    // -> push to the handler.
+                    d = d + 5;
+                }
+                catch (DivideByZeroException e)
+                {
+                    // value pushed by the CLR that contains object reference for the exception just thrown.
+                    // <>
+                    // stloc <e>
+                    d = d / 1;
+                }
+                catch (ArgumentOutOfRangeException f)
+                {
+                    d = d / 2;
+                }
+                catch (Exception g)
+                {
+                    d = d / 3;
+                }
+                finally
+                {
+                    d = d + 100;
+
+                    //arg2 = arg2 / 0;
+                }
+                return d + x;
+            }
+            catch
+            {
+                return 6700;
+            }
+            finally
             {
                 arg1 = 0;
                 arg2 = 0;

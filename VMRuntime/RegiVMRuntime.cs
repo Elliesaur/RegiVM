@@ -18,7 +18,7 @@ namespace RegiVM.VMRuntime
         private Dictionary<ByteArrayKey, object> ObjectHeap { get; } = new Dictionary<ByteArrayKey, object>();
 
         // TODO: Calculate max opcode supported.
-        public FuncDictionary<ulong> OpCodeHandlers { get; } = new FuncDictionary<ulong>(25);
+        public FuncDictionary<ulong> OpCodeHandlers { get; } = new FuncDictionary<ulong>(50);
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
 

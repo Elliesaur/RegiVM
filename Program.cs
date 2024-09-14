@@ -43,7 +43,7 @@ namespace RegiVM
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Math7");
+            var testMd = testType.Methods.First(x => x.Name == "Switch1");
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
@@ -54,7 +54,9 @@ namespace RegiVM
             Console.WriteLine($"Sizeof Data {data.Length} bytes");
 
             // Data for parameters is passed here.
-            RegiVMRuntime vm = new RegiVMRuntime(true, data, 50, 60);
+            // In reality the opcode handlers will be randomly chosen and inserted at compile time to the IL.
+            // This will not be static as shown below.
+            RegiVMRuntime vm = new RegiVMRuntime(true, data, 10, 60);
             vm.OpCodeHandlers.Add(compiler.OpCodes.NumberLoad, InstructionHandlers.NumberLoad);
             vm.OpCodeHandlers.Add(compiler.OpCodes.ParameterLoad, InstructionHandlers.ParameterLoad);
             vm.OpCodeHandlers.Add(compiler.OpCodes.Add, InstructionHandlers.Add);
@@ -72,8 +74,8 @@ namespace RegiVM
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, InstructionHandlers.Comparator);
 
 
-            var actualResult = TestProgram.Math7(50, 60);
-            Console.WriteLine(actualResult);
+            TestProgram.Switch1(10, 60);
+            //Console.WriteLine(actualResult);
 
             vm.Run();
             

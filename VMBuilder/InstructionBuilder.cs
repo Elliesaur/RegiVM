@@ -47,7 +47,7 @@ namespace RegiVM.VMBuilder
             }
         }
 
-        public int InstructionToOffset(CilInstruction realInstruction)
+        public int InstructionToIndex(CilInstruction realInstruction)
         {
             var index = _realInstructions.IndexOf(_realInstructions.FirstOrDefault(x => x.Item1 == realInstruction)!);
             return index;
@@ -115,6 +115,12 @@ namespace RegiVM.VMBuilder
                 case CilCode.Br:
                 case CilCode.Brfalse:
                 case CilCode.Brtrue:
+                case CilCode.Beq:
+                case CilCode.Blt:
+                case CilCode.Ble:
+                case CilCode.Bgt:
+                case CilCode.Bge:
+                case CilCode.Bne_Un:
                 case CilCode.Ldarg:
                 case CilCode.Ldloc:
                 case CilCode.Ldc_I4:
@@ -123,6 +129,13 @@ namespace RegiVM.VMBuilder
                 case CilCode.Starg:
                 case CilCode.Ceq:
                 case CilCode.Leave:
+                case CilCode.Ret:
+                case CilCode.Endfinally:
+                case CilCode.Bgt_Un:
+                case CilCode.Blt_Un:
+                case CilCode.Ble_Un:
+                case CilCode.Bge_Un:
+                case CilCode.Switch:
 
                 // Prefix 7 is used to know when a "startblock" occurs.
                 case CilCode.Prefix7:
