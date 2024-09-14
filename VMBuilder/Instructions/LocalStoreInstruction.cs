@@ -18,7 +18,7 @@ namespace RegiVM.VMBuilder.Instructions
         {
             Inst = inst;
             Registers = compiler.RegisterHelper;
-            OpCode = compiler.OpCodes.LocalLoadStore;
+            OpCode = compiler.OpCodes.LoadOrStoreRegister;
             LocalVar = localVar;
 
             TempReg1 = Registers.Temporary.Pop();

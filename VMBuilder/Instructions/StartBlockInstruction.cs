@@ -66,7 +66,7 @@ namespace RegiVM.VMBuilder.Instructions
         public StartBlockInstruction(VMCompiler compiler, IList<HandlerClause<CilInstruction>> handlers, VMBlockType blockType)
         {
             Registers = compiler.RegisterHelper;
-            OpCode = compiler.OpCodes.StartBlock;
+            OpCode = compiler.OpCodes.StartRegionBlock;
             this.compiler = compiler;
             BlockType = blockType;
 

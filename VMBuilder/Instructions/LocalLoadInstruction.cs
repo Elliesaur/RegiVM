@@ -16,7 +16,7 @@ namespace RegiVM.VMBuilder.Instructions
         {
             Inst = inst;
             Registers = compiler.RegisterHelper;
-            OpCode = compiler.OpCodes.LocalLoadStore;
+            OpCode = compiler.OpCodes.LoadOrStoreRegister;
 
             Reg1 = Registers.Registers.First(x => x.LocalVar == localVar);
             Reg1.LastOffsetUsed = Inst.Offset;

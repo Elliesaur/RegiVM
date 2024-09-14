@@ -72,11 +72,11 @@ namespace RegiVM.VMBuilder
                     }
                     var indx = state.InstructionBuilder.FindIndexForObject(statement);
                     // Instead of adding, look up the previous block.
-                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, vmHandler.PlaceholderStartInstruction!, indx);
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, vmHandler.PlaceholderStartInstruction!, indx);
                 }
                 else
                 {
-                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartBlock, statement);
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, statement);
                 }
 
                 foreach (var s in statement.ProtectedBlock.Statements)
@@ -125,7 +125,7 @@ namespace RegiVM.VMBuilder
                     var inst = expression.Instruction;
                     if (inst.IsStloc())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.LocalLoadStore, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst);
                     }
                     if (inst.OpCode.Code == CilCode.Add)
                     {
@@ -203,7 +203,7 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.IsLdloc())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.LocalLoadStore, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst);
                     }
                     if (inst.IsLdarg())
                     {
@@ -393,7 +393,7 @@ namespace RegiVM.VMBuilder
                         var ceqInst = new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThan);
                         state.InstructionBuilder.Add(ceqInst, inst);
                     }
-                    if (inst.IsBranch())
+                    if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
                         // Calculate instruction offset based on instruction builder's total instruction count???
                         // Add offset for it.
@@ -478,7 +478,10 @@ namespace RegiVM.VMBuilder
                         var brInst = new JumpBoolInstruction(state, position, inst);
                         state.InstructionBuilder.Add(brInst, inst);
                     }
-
+                    if (inst.OpCode.Code == CilCode.Switch)
+                    {
+                        var x = inst.Operand as IList<CilInstructionLabel>;
+                    }
                     return null!;
                 }
                 else
@@ -526,7 +529,7 @@ namespace RegiVM.VMBuilder
                         var endFinallyInst = new EndFinallyInstruction(state);
                         state.InstructionBuilder.Add(endFinallyInst, inst);
                     }
-                    if (inst.IsBranch())
+                    if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
                         var cilLabel = (CilInstructionLabel)inst.Operand!;
                         var instTarget = cilLabel.Instruction!;
