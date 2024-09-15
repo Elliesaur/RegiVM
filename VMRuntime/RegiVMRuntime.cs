@@ -1,5 +1,6 @@
 ﻿using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
+using RegiVM.VMRuntime.Handlers;
 using System.Diagnostics;
 using System.IO.Compression;
 
@@ -9,7 +10,10 @@ namespace RegiVM.VMRuntime
     {
         private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
         internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
-        internal ByteArrayKey RETURN_REGISTER;
+        internal ByteArrayKey RETURN_REGISTER = new ByteArrayKey([0xff, 0xff, 0x6, 0x1]);
+
+        // Current method index.
+        public int MethodIndex { get; set; } = 0;
 
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
@@ -22,6 +26,8 @@ namespace RegiVM.VMRuntime
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
 
+        public StackList<VMMethodSig> MethodSignatures { get; } = new StackList<VMMethodSig>();
+
         public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; }
 
         public StackList<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new StackList<VMRuntimeExceptionHandler>();
@@ -29,7 +35,7 @@ namespace RegiVM.VMRuntime
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
-        public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
+        public Dictionary<Tuple<int, int>, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<Tuple<int, int>, Tuple<int, int>>();
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -47,10 +53,28 @@ namespace RegiVM.VMRuntime
                 }
                 // Reuse arg.
                 data = uncompressedStream.ToArray();
-                var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
-                var track = 4;
+                int track = 0;
+
+                bool hasReturnValue = data.Skip(track).Take(1).ToArray()[0] == 1 ? true : false;
+                track += 1;
+
+                int numParams = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                track += 4;
+
+                MethodSignatures.Push(new VMMethodSig
+                {
+                    HasReturnValue = hasReturnValue,
+                    ReturnRegister = hasReturnValue ? RETURN_REGISTER : default, 
+                    ParamCount = numParams
+                });
+
+                var mappingLength = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                track += 4;
                 for (var i = 0; i < mappingLength; i++)
                 {
+                    var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
                     var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
 
@@ -60,7 +84,7 @@ namespace RegiVM.VMRuntime
                     var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
 
-                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                    InstructionOffsetMappings.Add(new Tuple<int, int>(methodIndex, mapKey), new Tuple<int, int>(offset1, offset2));
                 }
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
@@ -70,6 +94,9 @@ namespace RegiVM.VMRuntime
                 var track = 4;
                 for (var i = 0; i < mappingLength; i++) 
                 {
+                    var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    track += 4;
+
                     var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
 
@@ -79,7 +106,7 @@ namespace RegiVM.VMRuntime
                     var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
                     
-                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                    InstructionOffsetMappings.Add(new Tuple<int, int>(methodIndex, mapKey), new Tuple<int, int>(offset1, offset2));
                 }
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
@@ -102,7 +129,8 @@ namespace RegiVM.VMRuntime
 
             try
             {
-                var track = OpCodeHandlers[opCode](this, Heap, operandValue, Parameters);
+                // Use the current param values.
+                var track = OpCodeHandlers[opCode](this, Heap, operandValue, MethodSignatures.Peek().ParamValues);
                 // TRACK MUST BE KEPT UP TO DATE. FAILURE TO DO THIS WILL LEAD TO CRASHES.
                 if (track != operandLength)
                 {
@@ -174,9 +202,19 @@ namespace RegiVM.VMRuntime
             Stopwatch sw = new Stopwatch();
             sw.Start();
             int ip = 0;
+
+            // It is the first item, we know there is literally no others.
+            MethodSignatures.Peek().PreviousIP = int.MinValue;
+            MethodSignatures.Peek().ParamValues = Parameters;
+
             while (ip < Heap[DATA].Length)
             {
                 Step(ref ip);
+                if (ip == int.MinValue)
+                {
+                    // We have returned a value, or are wanting to return.
+                    break;
+                }
                 Heap[INSTRUCTION_POINTER] = BitConverter.GetBytes(ip);
             }
             sw.Stop();
@@ -198,6 +236,10 @@ namespace RegiVM.VMRuntime
 
         internal byte[] ConvertParameter(DataType dataType, object paramData)
         {
+            if (paramData.GetType() == typeof(byte[]))
+            {
+                return (byte[])paramData;
+            }
             return dataType switch
             {
                 DataType.Int32 => BitConverter.GetBytes((Int32)paramData),
@@ -493,8 +535,8 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.ToUInt16(val),
                 DataType.Single => BitConverter.ToSingle(val),
                 DataType.Double => BitConverter.ToDouble(val),
-                DataType.Boolean => (bool)(val[0] == 1 ? true : false)
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
+                DataType.Boolean => (bool)(val[0] == 1 ? true : false),
+                _ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 

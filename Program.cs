@@ -2,10 +2,6 @@
 using RegiVM.VMBuilder;
 using RegiVM.VMRuntime;
 using RegiVM.VMRuntime.Handlers;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using static RegiVM.VMRuntime.RegiVMRuntime;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RegiVM
 {
@@ -43,7 +39,7 @@ namespace RegiVM
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Switch1");
+            var testMd = testType.Methods.First(x => x.Name == "Call1");
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
@@ -72,10 +68,11 @@ namespace RegiVM
             vm.OpCodeHandlers.Add(compiler.OpCodes.StartRegionBlock, InstructionHandlers.StartRegionBlock);
             vm.OpCodeHandlers.Add(compiler.OpCodes.EndFinally, InstructionHandlers.Endfinally);
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, InstructionHandlers.Comparator);
+            vm.OpCodeHandlers.Add(compiler.OpCodes.JumpCall, InstructionHandlers.JumpCall);
 
 
-            TestProgram.Switch1(10, 60);
-            //Console.WriteLine(actualResult);
+            var actualResult = TestProgram.Call1(10, 60);
+            Console.WriteLine(actualResult);
 
             vm.Run();
             

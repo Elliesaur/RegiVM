@@ -71,7 +71,7 @@ namespace RegiVM.VMBuilder.Instructions
             BlockType = blockType;
 
             var cilHandlers = handlers.Select(x => (CilExceptionHandler)x.Tag!).ToList();
-            ExceptionHandlers = compiler.CompileExceptionHandlers(cilHandlers);
+            ExceptionHandlers = compiler.CompileExceptionHandlers(cilHandlers, compiler.MethodIndex);
             
             ByteCode = ToByteArray();
         }

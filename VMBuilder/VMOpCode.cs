@@ -25,6 +25,7 @@ namespace RegiVM.VMBuilder
         public ulong Comparator { get; set; } = 0x13000UL;
         public ulong StartRegionBlock { get; set; } = 0x14000UL;
         public ulong EndFinally { get; set; } = 0x17000UL;
+        public ulong JumpCall { get; set; } = 0x18000UL;
         public void RandomizeAll()
         {
             Random r = new Random();

@@ -15,6 +15,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // ADD 
             int tracker = 0;
+            Console.WriteLine("- [Add]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -45,6 +46,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // XOR 
             int tracker = 0;
+            Console.WriteLine("- [Bitwise AND]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -75,6 +77,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // DIV 
             int tracker = 0;
+            Console.WriteLine("- [Divide]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -105,6 +108,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // MUL 
             int tracker = 0;
+            Console.WriteLine("- [Multiply]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -135,6 +139,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // OR 
             int tracker = 0;
+            Console.WriteLine("- [Bitwise OR]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -165,6 +170,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // SUB 
             int tracker = 0;
+            Console.WriteLine("- [Subtract]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);
@@ -195,6 +201,7 @@ namespace RegiVM.VMRuntime.Handlers
         {
             // XOR 
             int tracker = 0;
+            Console.WriteLine("- [Bitwise XOR]");
 
             DataType push1DataType = t.ReadDataType(d, ref tracker);
             DataType pop1DataType = t.ReadDataType(d, ref tracker);

@@ -61,15 +61,17 @@ namespace RegiVM.VMBuilder
         public int ProcessedDepth { get; set; }
         public int Pop { get; set; }
         public int Push { get; set; }
+        public int MethodIndex { get; set; } = 0;
+
         public ScopeBlock<CilInstruction> MethodBlocks { get; private set; }
         public ControlFlowGraph<CilInstruction> MethodStaticFlowGraph { get; private set; }
         public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
         public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
-
+        public List<MethodDefinition> ViableInlineTargets { get; } = new List<MethodDefinition>();
         public VMCompiler()
         {
             RegisterHelper = null;
-            InstructionBuilder = new InstructionBuilder();
+            InstructionBuilder = new InstructionBuilder(this);
             OpCodes = new VMOpCode();
         }
 
@@ -96,45 +98,69 @@ namespace RegiVM.VMBuilder
 
         public byte[] Compile(MethodDefinition method)
         {
+            // Add itself.
+            ViableInlineTargets.Add(method);
+
             // TODO: Sort out concurrency issues.
             // Pass as param for AST visitor?
+            var methodCalls = method.CilMethodBody!.FindAllCalls();
+            foreach (var methodCall in methodCalls.Where(x => x is MethodDefinition))
+            {
+                var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
 
-            CurrentMethod = method;
-
-            var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
+                if (allCallsToMethod.All(x => x == method))
+                {
+                    // Only called by itself, no other method calls this method.
+                    ViableInlineTargets.Add((MethodDefinition)methodCall);
+                }
+            }
             
-            MethodBlocks = BlockBuilder.ConstructBlocks(sfg);
-            MethodStaticFlowGraph = sfg;
-            MethodDataFlowGraph = dfg;
+            foreach (var processMethod in ViableInlineTargets)
+            {
+                CurrentMethod = processMethod;
 
-            var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
+                var sfg = CurrentMethod.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
 
-            method.CilMethodBody!.Instructions.ExpandMacros();
+                MethodBlocks = BlockBuilder.ConstructBlocks(sfg);
+                MethodStaticFlowGraph = sfg;
+                MethodDataFlowGraph = dfg;
 
-            // Dry pass without exception handlers.
-            var dryPass = new VMNodeVisitorDryPass(DryPass.Regular);
-            dryPass.Visit(astCompUnit, this);
+                var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
 
-            ExceptionHandlers.AddRange(CompileExceptionHandlers(CurrentMethod.CilMethodBody!.ExceptionHandlers.ToList()));
+                CurrentMethod.CilMethodBody!.Instructions.ExpandMacros();
 
-            // Dry pass with exception handlers.
-            dryPass = new VMNodeVisitorDryPass(DryPass.ExceptionHandlers);
-            dryPass.Visit(astCompUnit, this);
+                // Dry pass without exception handlers.
+                var dryPass = new VMNodeVisitorDryPass(DryPass.Regular);
+                dryPass.Visit(astCompUnit, this);
+
+                ExceptionHandlers.AddRange(CompileExceptionHandlers(CurrentMethod.CilMethodBody!.ExceptionHandlers.ToList(), MethodIndex));
+
+                // Dry pass with exception handlers.
+                dryPass = new VMNodeVisitorDryPass(DryPass.ExceptionHandlers);
+                dryPass.Visit(astCompUnit, this);
 
 
-            var visitor = new VMNodeVisitor();
-            visitor.Visit(astCompUnit, this);
+                var visitor = new VMNodeVisitor();
+                visitor.Visit(astCompUnit, this);
 
-            //var walker = new VMAstWalker() { Compiler = this };
-            //AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
+                //var walker = new VMAstWalker() { Compiler = this };
+                //AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
 
-            method.CilMethodBody!.Instructions.OptimizeMacros();
+                CurrentMethod.CilMethodBody!.Instructions.OptimizeMacros();
+                
+                if (CurrentMethod != ViableInlineTargets.Last())
+                {
+                    // Increment the method index.
+                    MethodIndex++;
+                    InstructionBuilder.AddMethodDoNotIncrementMethodIndex();
+                }
+            }
 
-            return InstructionBuilder.ToByteArray(true);
+            return InstructionBuilder.ToByteArray(method, true);
         }
 
 
-        public List<VMExceptionHandler> CompileExceptionHandlers(List<CilExceptionHandler> handlers)
+        public List<VMExceptionHandler> CompileExceptionHandlers(List<CilExceptionHandler> handlers, int methodIndex)
         {
             var results = new List<VMExceptionHandler>();
             foreach (var handler in handlers)
@@ -155,8 +181,8 @@ namespace RegiVM.VMBuilder
                     {
                         throw new Exception("Cannot process handler start. No target found.");
                     }
-                    vmHandler.HandlerIndexStart = InstructionBuilder.InstructionToIndex(handlerStartInst);
-                    InstructionBuilder.AddUsedMapping(vmHandler.HandlerIndexStart);
+                    vmHandler.HandlerIndexStart = InstructionBuilder.InstructionToIndex(handlerStartInst, methodIndex);
+                    InstructionBuilder.AddUsedMapping(vmHandler.HandlerIndexStart, methodIndex);
                 }
                 if (filterStartInst != null)
                 {
@@ -170,8 +196,8 @@ namespace RegiVM.VMBuilder
                     {
                         throw new Exception("Cannot process filter start. No target found.");
                     }
-                    vmHandler.FilterIndexStart = InstructionBuilder.InstructionToIndex(filterStartInst);
-                    InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart);
+                    vmHandler.FilterIndexStart = InstructionBuilder.InstructionToIndex(filterStartInst, methodIndex);
+                    InstructionBuilder.AddUsedMapping(vmHandler.FilterIndexStart, methodIndex);
                 }
                 if (handler.ExceptionType != null)
                 {

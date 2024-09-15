@@ -1,4 +1,5 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
@@ -70,13 +71,13 @@ namespace RegiVM.VMBuilder
                     {
                         throw new Exception("Could not find associated vmHandler for the exception types.");
                     }
-                    var indx = state.InstructionBuilder.FindIndexForObject(statement);
+                    var indx = state.InstructionBuilder.FindIndexForObject(statement, state.MethodIndex);
                     // Instead of adding, look up the previous block.
-                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, vmHandler.PlaceholderStartInstruction!, indx);
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, vmHandler.PlaceholderStartInstruction!, state.MethodIndex, indx);
                 }
                 else
                 {
-                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, statement);
+                    state.InstructionBuilder.AddDryPass(state.OpCodes.StartRegionBlock, statement, state.MethodIndex);
                 }
 
                 foreach (var s in statement.ProtectedBlock.Statements)
@@ -125,45 +126,45 @@ namespace RegiVM.VMBuilder
                     var inst = expression.Instruction;
                     if (inst.IsStloc())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Add)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Add, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Add, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Sub)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Sub, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Sub, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Mul)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Mul, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Mul, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Div)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Div, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Div, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.And)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.And, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.And, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Or)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Or, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Or, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Xor)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Xor, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Xor, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ceq
                         || inst.OpCode.Code == CilCode.Cgt
                         || inst.OpCode.Code == CilCode.Clt)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst, state.MethodIndex);
                     }
                     if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
@@ -183,14 +184,18 @@ namespace RegiVM.VMBuilder
                             case CilCode.Blt:
                             case CilCode.Blt_Un:
                             case CilCode.Ble_Un:
-                                state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst);
+                                state.InstructionBuilder.AddDryPass(state.OpCodes.Comparator, inst, state.MethodIndex);
                                 break;
                         }
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Switch)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst, state.MethodIndex);
+                    }
+                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpCall, inst, state.MethodIndex);
                     }
                 }
                 else
@@ -198,7 +203,7 @@ namespace RegiVM.VMBuilder
                     var inst = expression.Instruction;
                     if (inst.IsLdcI4())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ldstr)
                     {
@@ -206,26 +211,30 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst, state.MethodIndex);
                     }
                     if (inst.IsLdloc())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst, state.MethodIndex);
                     }
                     if (inst.IsLdarg())
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.ParameterLoad, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.ParameterLoad, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Endfinally)
                     {
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.EndFinally, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.EndFinally, inst, state.MethodIndex);
                     }
                     if (inst.IsUnconditionalBranch())
                     {
                         // Load num.
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
                         // Jump.
-                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst, state.MethodIndex);
+                    }
+                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.JumpCall, inst, state.MethodIndex);
                     }
                 }
 
@@ -235,6 +244,11 @@ namespace RegiVM.VMBuilder
 
         public class VMNodeVisitor : IAstNodeVisitor<CilInstruction, VMCompiler, VMRegister>
         {
+
+            public VMNodeVisitor() 
+            {
+            }
+
             public VMRegister Visit(CompilationUnit<CilInstruction> unit, VMCompiler state)
             {
                 return unit.Root.Accept(this, state);
@@ -281,7 +295,7 @@ namespace RegiVM.VMBuilder
 
                 // Visit all statements in the protected block.
                 var startBlockInst = new StartBlockInstruction(state, statement.Handlers, VMBlockType.Protected);
-                state.InstructionBuilder.Add(startBlockInst);
+                state.InstructionBuilder.Add(startBlockInst, null!, state.MethodIndex);
 
                 foreach (var s in statement.ProtectedBlock.Statements)
                 {
@@ -336,7 +350,7 @@ namespace RegiVM.VMBuilder
                     if (inst.IsStloc())
                     {
                         var storeInst = new LocalStoreInstruction(state, inst, (CilLocalVariable)inst.Operand!);
-                        state.InstructionBuilder.Add(storeInst, inst);
+                        state.InstructionBuilder.Add(storeInst, inst, state.MethodIndex);
 
                         // Return the register that it is stored to.
                         // But why would I return anything when the stack is empty after stloc??
@@ -346,59 +360,59 @@ namespace RegiVM.VMBuilder
                     if (inst.OpCode.Code == CilCode.Add)
                     {
                         var addInst = new AddInstruction(state, inst);
-                        state.InstructionBuilder.Add(addInst, inst);
+                        state.InstructionBuilder.Add(addInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Sub)
                     {
                         var subInst = new SubInstruction(state, inst);
-                        state.InstructionBuilder.Add(subInst, inst);
+                        state.InstructionBuilder.Add(subInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Mul)
                     {
                         var mulInst = new MulInstruction(state, inst);
-                        state.InstructionBuilder.Add(mulInst, inst);
+                        state.InstructionBuilder.Add(mulInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Div)
                     {
                         var divInst = new DivInstruction(state, inst);
-                        state.InstructionBuilder.Add(divInst, inst);
+                        state.InstructionBuilder.Add(divInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.And)
                     {
                         var andInst = new AndInstruction(state, inst);
-                        state.InstructionBuilder.Add(andInst, inst);
+                        state.InstructionBuilder.Add(andInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Or)
                     {
                         var orInst = new OrInstruction(state, inst);
-                        state.InstructionBuilder.Add(orInst, inst);
+                        state.InstructionBuilder.Add(orInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Xor)
                     {
                         var xorInst = new XorInstruction(state, inst);
-                        state.InstructionBuilder.Add(xorInst, inst);
+                        state.InstructionBuilder.Add(xorInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
                         var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
-                        state.InstructionBuilder.Add(retInst, inst);
+                        state.InstructionBuilder.Add(retInst, inst, state.MethodIndex);
                         // Lol, actually return something?
                         return retInst.TempReg1;
                     }
                     if (inst.OpCode.Code == CilCode.Ceq)
                     {
                         var ceqInst = new ComparatorInstruction(state, inst, ComparatorType.IsEqual);
-                        state.InstructionBuilder.Add(ceqInst, inst);
+                        state.InstructionBuilder.Add(ceqInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Clt)
                     {
                         var ceqInst = new ComparatorInstruction(state, inst, ComparatorType.IsLessThan);
-                        state.InstructionBuilder.Add(ceqInst, inst);
+                        state.InstructionBuilder.Add(ceqInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Cgt)
                     {
                         var ceqInst = new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThan);
-                        state.InstructionBuilder.Add(ceqInst, inst);
+                        state.InstructionBuilder.Add(ceqInst, inst, state.MethodIndex);
                     }
                     if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
@@ -428,40 +442,40 @@ namespace RegiVM.VMBuilder
                         switch (inst.OpCode.Code)
                         {
                             case CilCode.Beq:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsEqual), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsEqual), inst, state.MethodIndex);
                                 break;
                             case CilCode.Bne_Un:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsNotEqualUnsignedUnordered), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsNotEqualUnsignedUnordered), inst, state.MethodIndex);
                                 break;
                             case CilCode.Bge:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqual), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqual), inst, state.MethodIndex);
                                 break;
                             case CilCode.Bgt:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThan), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThan), inst, state.MethodIndex);
                                 break;
                             case CilCode.Bgt_Un:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanUnsignedUnordered), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanUnsignedUnordered), inst, state.MethodIndex);
                                 break;
                             case CilCode.Bge_Un:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqualUnsignedUnordered), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsGreaterThanOrEqualUnsignedUnordered), inst, state.MethodIndex);
                                 break;
 
                             case CilCode.Ble:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqual), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqual), inst, state.MethodIndex);
                                 break;
                             case CilCode.Blt:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThan), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThan), inst, state.MethodIndex);
                                 break;
                             case CilCode.Blt_Un:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanUnsignedUnordered), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanUnsignedUnordered), inst, state.MethodIndex);
                                 break;
                             case CilCode.Ble_Un:
-                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqualUnsignedUnordered), inst);
+                                state.InstructionBuilder.Add(new ComparatorInstruction(state, inst, ComparatorType.IsLessThanOrEqualUnsignedUnordered), inst, state.MethodIndex);
                                 break;
                         }
 
 
-                        int position = state.InstructionBuilder.InstructionToIndex(instTarget);
+                        int position = state.InstructionBuilder.InstructionToIndex(instTarget, state.MethodIndex);
 
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
@@ -472,7 +486,7 @@ namespace RegiVM.VMBuilder
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
-                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction);
+                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction, state.MethodIndex);
                             }
                             else
                             {
@@ -483,10 +497,10 @@ namespace RegiVM.VMBuilder
                         {
                             throw new Exception("Position cannot be below zero.");
                         }
-                        state.InstructionBuilder.AddUsedMapping(position);
+                        state.InstructionBuilder.AddUsedMapping(position, state.MethodIndex);
 
                         var brInst = new JumpBoolInstruction(state, inst, position);
-                        state.InstructionBuilder.Add(brInst, inst);
+                        state.InstructionBuilder.Add(brInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Switch)
                     {
@@ -506,16 +520,46 @@ namespace RegiVM.VMBuilder
                             {
                                 throw new Exception("Cannot process branch target. No target found.");
                             }
-                            int position = state.InstructionBuilder.InstructionToIndex(instTarget);
+                            int position = state.InstructionBuilder.InstructionToIndex(instTarget, state.MethodIndex);
                             if (position < 0)
                             {
                                 throw new Exception("Position cannot be below zero.");
                             }
-                            state.InstructionBuilder.AddUsedMapping(position);
+                            state.InstructionBuilder.AddUsedMapping(position, state.MethodIndex);
                             offsets.Add(position);
                         }
                         var switchInst = new JumpBoolInstruction(state, inst, offsets.ToArray());
-                        state.InstructionBuilder.Add(switchInst, inst);
+                        state.InstructionBuilder.Add(switchInst, inst, state.MethodIndex);
+                    }
+                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    {
+                        // TODO: Callvirt support.
+                        if (inst.OpCode.Code == CilCode.Callvirt)
+                        {
+                            throw new NotImplementedException("Not implemented callvirt yet.");
+                        }
+                        var methodDef = inst.Operand as MethodDefinition;
+                        if (methodDef == null)
+                        {
+                            // Method ref...?
+                            throw new NotImplementedException("Not implemented external calls yet.");
+                        }
+
+                        var canInline = state.ViableInlineTargets.Contains(methodDef);
+                        if (!canInline)
+                        {
+                            throw new NotImplementedException("Not implemented non-inlineable calls yet.");
+                        }
+
+                        // We find the method index to call based on the processing "line" of the methods to inline.
+                        var methodIndexToCall = state.ViableInlineTargets.IndexOf(methodDef);
+                        // Make sure the first instruction of every method index is added as a used mapping.
+                        // At runtime, the call to the method index can then happen based on the instruction mapping.
+                        state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
+
+                        // We make a new jump call and specify the method index to call.
+                        var jumpCallInst = new JumpCallInstruction(state, inst, methodDef, methodIndexToCall, canInline);
+                        state.InstructionBuilder.Add(jumpCallInst, inst, state.MethodIndex);
                     }
                     return null!;
                 }
@@ -526,7 +570,7 @@ namespace RegiVM.VMBuilder
                     if (inst.IsLdcI4())
                     {
                         var numLoad = new NumLoadInstruction(state, (int)inst.Operand!, DataType.Int32, inst);
-                        state.InstructionBuilder.Add(numLoad, inst);
+                        state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
 
                         // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
                         reg = numLoad.TempReg1;
@@ -539,7 +583,7 @@ namespace RegiVM.VMBuilder
                     if (inst.IsLdloc())
                     {
                         var loadInst = new LocalLoadInstruction(state, inst, (CilLocalVariable)inst.Operand!);
-                        state.InstructionBuilder.Add(loadInst, inst);
+                        state.InstructionBuilder.Add(loadInst, inst, state.MethodIndex);
                         reg = loadInst.TempReg1;
                     }
                     if (inst.IsLdarg())
@@ -552,7 +596,7 @@ namespace RegiVM.VMBuilder
                             throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
                         }
                         var ldargInst = new ParamLoadInstruction(state, param.Index, (DataType)dataType, param, inst);
-                        state.InstructionBuilder.Add(ldargInst, inst);
+                        state.InstructionBuilder.Add(ldargInst, inst, state.MethodIndex);
                         
                         // Load the tempreg where the param is existing.
                         reg = ldargInst.TempReg1;
@@ -561,13 +605,13 @@ namespace RegiVM.VMBuilder
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
                         var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
-                        state.InstructionBuilder.Add(retInst, inst);
+                        state.InstructionBuilder.Add(retInst, inst, state.MethodIndex);
                     }
                     // TODO: Endfilter at some point?
                     if (inst.OpCode.Code == CilCode.Endfinally)
                     {
                         var endFinallyInst = new EndFinallyInstruction(state);
-                        state.InstructionBuilder.Add(endFinallyInst, inst);
+                        state.InstructionBuilder.Add(endFinallyInst, inst, state.MethodIndex);
                     }
                     if (inst.IsBranch() && inst.OpCode.Code != CilCode.Switch)
                     {
@@ -587,14 +631,14 @@ namespace RegiVM.VMBuilder
                         if (inst.IsUnconditionalBranch())
                         {
                             var numLoadInst = new NumLoadInstruction(state, true, DataType.Boolean, inst);
-                            state.InstructionBuilder.Add(numLoadInst, inst);
+                            state.InstructionBuilder.Add(numLoadInst, inst, state.MethodIndex);
                         }
                         else if (inst.IsConditionalBranch())
                         {
                             // Technically there should be something already on the stack??
                         }
 
-                        int position = state.InstructionBuilder.InstructionToIndex(instTarget);
+                        int position = state.InstructionBuilder.InstructionToIndex(instTarget, state.MethodIndex);
 
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
@@ -605,7 +649,7 @@ namespace RegiVM.VMBuilder
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
                                 // Just use closest.
-                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction);
+                                position = state.InstructionBuilder.InstructionToIndex(closest.Item2.PlaceholderStartInstruction, state.MethodIndex);
                             }
                             else
                             {
@@ -617,15 +661,15 @@ namespace RegiVM.VMBuilder
                         {
                             throw new Exception("Position cannot be below zero.");
                         }
-                        state.InstructionBuilder.AddUsedMapping(position);
+                        state.InstructionBuilder.AddUsedMapping(position, state.MethodIndex);
 
                         var brInst = new JumpBoolInstruction(state, inst, position);
-                        state.InstructionBuilder.Add(brInst, inst);
+                        state.InstructionBuilder.Add(brInst, inst, state.MethodIndex);
 
                         // There is no register for this operation, leave it null.
                         reg = null!;
                     }
-
+                    // TODO: CALL SUPPORT HERE.
                     return reg;
                 }
                 

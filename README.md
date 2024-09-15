@@ -552,7 +552,8 @@ This is very basic for now, more will be added in time.
 - [X] Refine try/catch to support handlers without exception types.
 - [X] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
 - [X] Add support for switch statements
-- [ ] Add support for calls and restructure VM runtime for jump to call support. Particularly, parameter offsets, returns and so on.
+- [X] Add support for basic method def calls that return supported data types and restructure VM runtime for jump to call support. Particularly, parameter offsets, returns and so on.
+- [ ] Add support for other calls that are not inlined.
 - [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
 - [ ] Add support for storing into parameters (starg).
 - [ ] Add support for new objects.

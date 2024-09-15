@@ -262,87 +262,15 @@ namespace RegiVM
                 arg2 = 0;
             }
         }
-        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
-        public static int Math8(int arg1, int arg2)
-        {
-            try
-            {
-            a:
-                int x = -10;
-                int d = arg1;
-                d = d - arg2;
-                d = Math2(arg1, arg2);
-                if (d == 0)
-                {
-                    goto a;
-                }
-                switch (d)
-                {
-                    case 30:
-                    case 35:
-                    case 37:
-                        x = 10;
-                        d = 10;
-                        break;
-                    case 40:
-                        x = 20;
-                        break;
-                    case 50:
-                    case 60:
-                        x = 30;
-                        d = 30;
-                        break;
-                    default:
-                        x = 40;
-                        break;
-                }
-                if (d != 34)
-                {
-                    d = 600;
-                }
-                else
-                {
-                    d = 500;
-                }
-                try
-                {
-                    d = d / 0;
-                    // exception happens
-                    // -> push to the handler.
-                    d = d + 5;
-                }
-                catch (DivideByZeroException e)
-                {
-                    // value pushed by the CLR that contains object reference for the exception just thrown.
-                    // <>
-                    // stloc <e>
-                    d = d / 1;
-                }
-                catch (ArgumentOutOfRangeException f)
-                {
-                    d = d / 2;
-                }
-                catch (Exception g)
-                {
-                    d = d / 3;
-                }
-                finally
-                {
-                    d = d + 100;
 
-                    //arg2 = arg2 / 0;
-                }
-                return d + x;
-            }
-            catch
-            {
-                return 6700;
-            }
-            finally
-            {
-                arg1 = 0;
-                arg2 = 0;
-            }
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static int Call1(int arg1, int arg2)
+        {
+            int a = arg1 + 2;
+            int b = Math2(a, arg2 * 2);
+            b = b * 2;
+            int c = Math2(b, a);
+            return b + c;
         }
     }
 }

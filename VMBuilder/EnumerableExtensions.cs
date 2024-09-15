@@ -1,4 +1,5 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Instructions;
 using System;
@@ -109,6 +110,42 @@ namespace RegiVM.VMBuilder
                 }
             }
             return closestRange;
+        }
+        
+        public static IList<IMethodDefOrRef> FindAllCalls(this CilMethodBody md)
+        {
+            var res = new List<IMethodDefOrRef>();
+            foreach (var inst in md.Instructions)
+            {
+                if (inst.OpCode.FlowControl != CilFlowControl.Call)
+                {
+                    continue;
+                }
+
+                if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt)
+                    && inst.Operand is IMethodDefOrRef)
+                {
+                    res.Add((IMethodDefOrRef)inst.Operand!);
+                }
+            }
+            return res;
+        }
+
+        public static IList<IMethodDefOrRef> FindAllCallsToMethod(this MethodDefinition md)
+        {
+            var res = new List<IMethodDefOrRef>();
+            foreach (var td in md.Module!.GetAllTypes())
+            {
+                foreach (var method in td.Methods.Where(x => x.HasMethodBody))
+                {
+                    var calls = method.CilMethodBody!.FindAllCalls();
+                    if (calls.Any(x => x == md))
+                    {
+                        res.Add(method);
+                    }
+                }
+            }
+            return res;
         }
     }
 }
