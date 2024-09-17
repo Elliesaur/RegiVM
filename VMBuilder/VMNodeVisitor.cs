@@ -669,7 +669,33 @@ namespace RegiVM.VMBuilder
                         // There is no register for this operation, leave it null.
                         reg = null!;
                     }
-                    // TODO: CALL SUPPORT HERE.
+
+                    // Cannot have Callvirt without arguments...
+                    if ((inst.OpCode.Code == CilCode.Call) && inst.Operand is IMethodDefOrRef)
+                    {
+                        var methodDef = inst.Operand as MethodDefinition;
+                        if (methodDef == null)
+                        {
+                            // Method ref...?
+                            throw new NotImplementedException("Not implemented external calls yet.");
+                        }
+
+                        var canInline = state.ViableInlineTargets.Contains(methodDef);
+                        if (!canInline)
+                        {
+                            throw new NotImplementedException("Not implemented non-inlineable calls yet.");
+                        }
+
+                        // We find the method index to call based on the processing "line" of the methods to inline.
+                        var methodIndexToCall = state.ViableInlineTargets.IndexOf(methodDef);
+                        // Make sure the first instruction of every method index is added as a used mapping.
+                        // At runtime, the call to the method index can then happen based on the instruction mapping.
+                        state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
+
+                        // We make a new jump call and specify the method index to call.
+                        var jumpCallInst = new JumpCallInstruction(state, inst, methodDef, methodIndexToCall, canInline);
+                        state.InstructionBuilder.Add(jumpCallInst, inst, state.MethodIndex);
+                    }
                     return reg;
                 }
                 

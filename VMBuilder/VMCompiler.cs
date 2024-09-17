@@ -108,7 +108,7 @@ namespace RegiVM.VMBuilder
             {
                 var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
 
-                if (allCallsToMethod.All(x => x == method))
+                if (allCallsToMethod.All(x => x == method) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
                 {
                     // Only called by itself, no other method calls this method.
                     ViableInlineTargets.Add((MethodDefinition)methodCall);

@@ -126,8 +126,10 @@ namespace RegiVM.VMBuilder
                 foreach (var instIndex in _usedInstructionIndexes.Shuffle())
                 {
                     var mappingItem = _instructionOffsetMappings[instIndex];
-                    // Method Index
+
+                    // Method Index... TODO: Figure out how to remove this! No need for it :)
                     writer.Write(instIndex.Item1);
+                    
                     // Instruction Index
                     writer.Write(instIndex.Item2);
 
