@@ -30,14 +30,14 @@ namespace RegiVM.VMBuilder.Instructions
             var paramCount = target.Signature!.GetTotalParameterCount();
             for (int i = 0; i < paramCount; i++)
             {
-                ArgRegs.Add(Registers.Temporary.Pop());
+                ArgRegs.Add((Registers.Temporary.Pop()));
             }
             // Reverse order for proper assignments.
             ArgRegs.Reverse();
 
             if (target.Signature!.ReturnsValue)
             {
-                ReturnReg1 = Registers.ForTemp();
+                ReturnReg1 = (Registers.ForTemp());
                 var typeName = target.Signature!.ReturnType.ToTypeDefOrRef().Name;
                 if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
                 {

@@ -266,11 +266,22 @@ namespace RegiVM
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
         public static int Call1(int arg1, int arg2)
         {
-            int a = arg1 + 2;
-            int b = Math2(a, arg2 * 2);
-            b = b * 2;
-            int c = Math2(b, a);
-            return b + c;
+            try
+            {
+                int a = arg1 + 2;
+                int b = Math2(a, arg2 * 2);
+                b = b * 2;
+                int c = Math2(b, a);
+                return b + c;
+            }
+            catch (Exception)
+            {
+                return arg1 + arg2;
+            }
+            finally
+            {
+                int hello = 1337;
+            }
         }
     }
 }

@@ -136,7 +136,7 @@ namespace RegiVM.VMRuntime.Handlers
                     // ECMA: if value is less than n execution is transferred to the valueths target.
                     // value of 1 takes the second target, 0 takes the first target.
                     var option = jumpOffsets[value];
-                    tracker = t.InstructionOffsetMappings[new Tuple<int, int>(t.MethodIndex, option)].Item1;
+                    tracker = t.InstructionOffsetMappings[option].Item1;
                     return tracker;
                 }
                 else
@@ -150,7 +150,7 @@ namespace RegiVM.VMRuntime.Handlers
                 Console.WriteLine("- > Regular Jump");
 
                 int branchToOffset = jumpOffsets[0];
-                int branchToOffsetValue = t.InstructionOffsetMappings[new Tuple<int, int>(t.MethodIndex, branchToOffset)].Item1;
+                int branchToOffsetValue = t.InstructionOffsetMappings[branchToOffset].Item1;
 
                 if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
@@ -230,12 +230,8 @@ namespace RegiVM.VMRuntime.Handlers
                 throw new NotImplementedException("Non-inline call not implemented.");
             }
 
-            int methodIndexToCall = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int methodOffsetToCall = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
             tracker += 4;
-
-            // Get first instruction offset in method to call.
-            int realMethodOffset = t.InstructionOffsetMappings[new Tuple<int, int>(methodIndexToCall, 0)].Item1;
-            //int lastOffsetForCurrentMethod = tracker;
 
             bool hasReturnValue = d.Skip(tracker).Take(1).ToArray()[0] == 1 ? true : false;
             tracker++;
@@ -277,7 +273,7 @@ namespace RegiVM.VMRuntime.Handlers
             
             t.MethodIndex++;
 
-            tracker = realMethodOffset;
+            tracker = methodOffsetToCall;
             
             return tracker;
         }
@@ -441,14 +437,14 @@ namespace RegiVM.VMRuntime.Handlers
                 tracker += 4;
                 if (handlerOffsetStartIndex > 0)
                 {
-                    handler.HandlerOffsetStart = t.InstructionOffsetMappings[new Tuple<int, int>(t.MethodIndex, handlerOffsetStartIndex)].Item1;
+                    handler.HandlerOffsetStart = t.InstructionOffsetMappings[handlerOffsetStartIndex].Item1;
                 }
 
                 int filterOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
                 tracker += 4;
                 if (filterOffsetStartIndex > 0)
                 {
-                    handler.FilterOffsetStart = t.InstructionOffsetMappings[new Tuple<int, int>(t.MethodIndex, filterOffsetStartIndex)].Item1;
+                    handler.FilterOffsetStart = t.InstructionOffsetMappings[filterOffsetStartIndex].Item1;
                 }
 
                 uint exceptionTypeToken = BitConverter.ToUInt32(d.Skip(tracker).Take(4).ToArray());

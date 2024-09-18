@@ -128,7 +128,7 @@ namespace RegiVM.VMBuilder
                     var mappingItem = _instructionOffsetMappings[instIndex];
 
                     // Method Index... TODO: Figure out how to remove this! No need for it :)
-                    writer.Write(instIndex.Item1);
+                    //writer.Write(instIndex.Item1);
                     
                     // Instruction Index
                     writer.Write(instIndex.Item2);
@@ -146,8 +146,35 @@ namespace RegiVM.VMBuilder
                         if (instruction is JumpCallInstruction)
                         {
                             var operandBytes = instruction.ByteCode;
-                            writer.Write(operandBytes.Length);
-                            writer.Write(operandBytes);
+
+                            // Patch offset.
+                            byte[] newOperandBytes = new byte[operandBytes.Length];
+                            using (var mStreamO = new MemoryStream(newOperandBytes))
+                            using (var mStream = new MemoryStream(operandBytes))
+                            using (var bReader = new BinaryReader(mStream))
+                            using (var bWriter = new BinaryWriter(mStreamO))
+                            {
+                                // If position == 4 then overwrite with new byte.
+                                var existing = bReader.ReadBytes(1);
+                                bWriter.Write(existing);
+
+                                var methodIndex = bReader.ReadInt32();
+                                // Read the real offset.
+                                var methodIndexOffset = _instructionOffsetMappings[new Tuple<int, int>(methodIndex, 0)].Item1;
+                                bWriter.Write(methodIndexOffset);
+                                try
+                                {
+                                    while (true) 
+                                        bWriter.Write(bReader.ReadByte());
+                                }
+                                catch (Exception)
+                                {
+                                    // Ugh, yea I could handle it properly.
+                                }
+                                writer.Write(newOperandBytes.Length);
+                                writer.Write(newOperandBytes);
+                            }
+                            
                         }
                         else
                         {

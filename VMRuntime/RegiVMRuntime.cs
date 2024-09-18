@@ -35,7 +35,7 @@ namespace RegiVM.VMRuntime
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
-        public Dictionary<Tuple<int, int>, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<Tuple<int, int>, Tuple<int, int>>();
+        public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -72,8 +72,9 @@ namespace RegiVM.VMRuntime
                 track += 4;
                 for (var i = 0; i < mappingLength; i++)
                 {
-                    var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                    // TODO: Remove this, how!?
+                    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    //track += 4;
 
                     var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
@@ -84,7 +85,7 @@ namespace RegiVM.VMRuntime
                     var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
 
-                    InstructionOffsetMappings.Add(new Tuple<int, int>(methodIndex, mapKey), new Tuple<int, int>(offset1, offset2));
+                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
                 }
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
@@ -94,8 +95,8 @@ namespace RegiVM.VMRuntime
                 var track = 4;
                 for (var i = 0; i < mappingLength; i++) 
                 {
-                    var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                    //track += 4;
 
                     var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
@@ -106,7 +107,7 @@ namespace RegiVM.VMRuntime
                     var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
                     track += 4;
                     
-                    InstructionOffsetMappings.Add(new Tuple<int, int>(methodIndex, mapKey), new Tuple<int, int>(offset1, offset2));
+                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
                 }
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
