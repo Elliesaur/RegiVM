@@ -297,8 +297,6 @@ namespace RegiVM.VMRuntime.Handlers
                 ReturnRegister = returnRegKey
             });
             
-            t.MethodIndex++;
-
             tracker = methodOffsetToCall;
             
             return tracker;
@@ -442,9 +440,6 @@ namespace RegiVM.VMRuntime.Handlers
 
             var last = t.MethodSignatures.Pop();
             
-            // Decrement method index.
-            t.MethodIndex--;
-
             // If we have a value, and we don't have any further methods on stack, set the return register.
             if (hasValue)
             {

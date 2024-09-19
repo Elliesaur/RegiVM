@@ -12,9 +12,6 @@ namespace RegiVM.VMRuntime
         internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
         internal ByteArrayKey RETURN_REGISTER = new ByteArrayKey([0xff, 0xff, 0x6, 0x1]);
 
-        // Current method index.
-        public int MethodIndex { get; set; } = 0;
-
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
 
