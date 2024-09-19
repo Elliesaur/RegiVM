@@ -502,6 +502,7 @@ This is very basic for now, more will be added in time.
 
 ## Control Flow
 - JUMP_BOOL `<offset(s)-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches, leaves, switches)
+- JUMP_CALL
 - START_BLOCK `<handlers-as-objects>`
 - END_FINALLY
 
@@ -546,6 +547,8 @@ This is very basic for now, more will be added in time.
 - blt.un
 - ble.un
 - switch
+- call
+- dup
 - nop (not supported, never will be)
   
 # TODO
@@ -554,13 +557,14 @@ This is very basic for now, more will be added in time.
 - [X] Add support for switch statements
 - [X] Add support for basic method def calls that return supported data types and restructure VM runtime for jump to call support. Particularly, parameter offsets, returns and so on.
 - [ ] Add support for other calls that are not inlined.
+- [X] Add support for dup
 - [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
 - [ ] Add support for storing into parameters (starg).
+- [ ] Add support for general objects and passing them as params/loading them onto registers.
 - [ ] Add support for new objects.
 - [ ] Add support for throwing exceptions.
 - [ ] Add support for converting between number data types (conv...).
 - [ ] Additional testing for exception handlers.
-- [ ] Add support for calling basic methods (both definition and references) with arbitrary number of arguments (use registers).
 
 # Dependencies
 - The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).
