@@ -69,6 +69,7 @@ namespace RegiVM
             vm.OpCodeHandlers.Add(compiler.OpCodes.EndFinally, InstructionHandlers.Endfinally);
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, InstructionHandlers.Comparator);
             vm.OpCodeHandlers.Add(compiler.OpCodes.JumpCall, InstructionHandlers.JumpCall);
+            vm.OpCodeHandlers.Add(compiler.OpCodes.Duplicate, InstructionHandlers.DuplicateRegister);
 
 
             var actualResult = TestProgram.Call1(10, 60);

@@ -35,6 +35,7 @@ namespace RegiVM.VMBuilder
 
             public void Visit(AssignmentStatement<CilInstruction> statement, VMCompiler state)
             {
+                statement.Expression.Accept(this, state);
             }
 
             public void Visit(ExpressionStatement<CilInstruction> statement, VMCompiler state)
@@ -156,6 +157,10 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Xor, inst, state.MethodIndex);
                     }
+                    if (inst.OpCode.Code == CilCode.Dup)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Duplicate, inst, state.MethodIndex);
+                    }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Ret, inst, state.MethodIndex);
@@ -258,7 +263,8 @@ namespace RegiVM.VMBuilder
             public VMRegister Visit(AssignmentStatement<CilInstruction> statement, VMCompiler state)
             {
                 //statement.Accept(this, state);
-                return null!;
+                var x = statement.Expression.Accept(this, state);
+                return x;
             }
 
             public VMRegister Visit(ExpressionStatement<CilInstruction> statement, VMCompiler state)
@@ -331,6 +337,7 @@ namespace RegiVM.VMBuilder
 
             public VMRegister Visit(VariableExpression<CilInstruction> expression, VMCompiler state)
             {
+                
                 return null!;
                 //expression.Accept(this, state);
             }
@@ -391,6 +398,11 @@ namespace RegiVM.VMBuilder
                     {
                         var xorInst = new XorInstruction(state, inst);
                         state.InstructionBuilder.Add(xorInst, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Dup)
+                    {
+                        var dupInst = new DuplicateInstruction(state, inst);
+                        state.InstructionBuilder.Add(dupInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
@@ -606,6 +618,11 @@ namespace RegiVM.VMBuilder
                     {
                         var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
                         state.InstructionBuilder.Add(retInst, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Dup)
+                    {
+                        var dupInst = new DuplicateInstruction(state, inst);
+                        state.InstructionBuilder.Add(dupInst, inst, state.MethodIndex);
                     }
                     // TODO: Endfilter at some point?
                     if (inst.OpCode.Code == CilCode.Endfinally)

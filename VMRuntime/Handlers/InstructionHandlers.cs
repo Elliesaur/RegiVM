@@ -154,6 +154,8 @@ namespace RegiVM.VMRuntime.Handlers
 
                 if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
+                    Console.WriteLine("- > Leave protected (catch)");
+
                     // Make sure we clear the exception handlers for the same protected block...
                     var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == t.ActiveExceptionHandler.Id && x.Type != VMBlockType.Finally);
                     foreach (var sameRegionHandler in sameRegionHandlers.ToList())
@@ -170,6 +172,8 @@ namespace RegiVM.VMRuntime.Handlers
 
                 if (isLeaveProtected && t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
                 {
+                    Console.WriteLine("- > Leave protected (finally)");
+
                     // Is finally instruction.
                     var finallyClause = t.ExceptionHandlers.Pop();
                     t.ActiveExceptionHandler = finallyClause;
@@ -180,7 +184,29 @@ namespace RegiVM.VMRuntime.Handlers
                 }
                 else if (isLeaveProtected)
                 {
-                    if (shouldBranch)
+                    Console.WriteLine("- > Leave protected (no catch executed, check finally)");
+                    if (t.ExceptionHandlers.Count > 0)
+                    {
+                        // Exiting from a protected block without throwing exception
+                        //   wipe the exception handlers for the current id.
+                        var last = t.ExceptionHandlers.Pop();
+                        var sameRegionHandlers = t.ExceptionHandlers.items.Where(x => x.Id == last.Id && x.Type != VMBlockType.Finally);
+                        foreach (var sameRegionHandler in sameRegionHandlers.ToList())
+                        {
+                            t.ExceptionHandlers.Remove(sameRegionHandler);
+                        }
+                        if (t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+                        {
+                            // Treat as finally.
+                            var finallyClause = t.ExceptionHandlers.Pop();
+                            t.ActiveExceptionHandler = finallyClause;
+                            tracker = finallyClause.HandlerOffsetStart;
+
+                            // Store the active leave inst offset so we know where to go after the endfinally instruction.
+                            t.ActiveExceptionHandler.LeaveInstOffset = branchToOffsetValue;
+                        }
+                    }
+                    else if (shouldBranch)
                     {
                         tracker = branchToOffsetValue;
                     }
@@ -313,7 +339,32 @@ namespace RegiVM.VMRuntime.Handlers
             }
             return tracker;
         }
-        
+
+        internal static int DuplicateRegister(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+                                                Dictionary<int, object> _)
+        {
+            // This covers loading and storing.
+            int tracker = 0;
+            Console.WriteLine("- [Duplicate]");
+
+            byte[] from = t.ReadBytes(d, ref tracker, out int fromLength);
+            byte[] to = t.ReadBytes(d, ref tracker, out int toLength);
+
+            ByteArrayKey fromReg = new ByteArrayKey(from);
+            ByteArrayKey toReg = new ByteArrayKey(to);
+            byte[] valueFrom = h[fromReg];
+
+            if (!h.ContainsKey(toReg))
+            {
+                h.Add(toReg, valueFrom);
+            }
+            else
+            {
+                h[toReg] = valueFrom;
+            }
+            return tracker;
+        }
+
         internal static int NumberLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                        Dictionary<int, object> _)
         {
