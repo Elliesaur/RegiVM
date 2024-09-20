@@ -25,6 +25,9 @@ jobs:
         dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore AsmResolver/AsmResolver.sln && dotnet restore Echo/Echo.sln && dotnet restore
-    - name: Build
+    - name: Build AsmResolver
+      run: dotnet build --no-restore AsmResolver/AsmResolver.sln 
+    - name: Build Echo
+      run: dotnet build --no-restore Echo/Echo.sln 
+    - name: Build RegiVM
       run: dotnet build --no-restore
-      
