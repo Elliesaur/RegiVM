@@ -40,8 +40,6 @@ namespace RegiVM.VMBuilder
         Int16 = 0x9,
         UInt16 = 0x10,
 
-        String = 0x11,
-
         Boolean = 0x12,
 
         Phi = 0x13

@@ -499,10 +499,12 @@ This is very basic for now, more will be added in time.
 - LOAD `<reg-from> <reg-to>` (this is actually just store again!)
 - COMPARE `<reg-to-save-to> <comparator-type> <reg-left-compare> <reg-right-compare>`
 - RET `<register>`
+- CONVERT_NUM `<from-datatype>` `<to-datatype>` `<from-reg>` `<to-reg>` `<should-throw-overflow>`
 
 ## Control Flow
 - JUMP_BOOL `<offset(s)-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches, leaves, switches)
 - START_BLOCK `<handlers-as-objects>`
+- JUMP_CALL
 - END_FINALLY
 
 ## Maths
@@ -546,6 +548,7 @@ This is very basic for now, more will be added in time.
 - blt.un
 - ble.un
 - switch
+- conv_* (all however many there are)
 - nop (not supported, never will be)
   
 # TODO
@@ -558,7 +561,7 @@ This is very basic for now, more will be added in time.
 - [ ] Add support for storing into parameters (starg).
 - [ ] Add support for new objects.
 - [ ] Add support for throwing exceptions.
-- [ ] Add support for converting between number data types (conv...).
+- [X] Add support for converting between number data types (conv...).
 - [ ] Additional testing for exception handlers.
 - [ ] Add support for calling basic methods (both definition and references) with arbitrary number of arguments (use registers).
 

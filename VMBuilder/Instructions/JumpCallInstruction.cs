@@ -64,6 +64,7 @@ namespace RegiVM.VMBuilder.Instructions
                 foreach (var arg in ArgRegs)
                 {
                     // Writer registers to use in call.
+                    writer.Write((byte)arg.DataType);
                     writer.Write(arg.RawName.Length);
                     writer.Write(arg.RawName);
                 }

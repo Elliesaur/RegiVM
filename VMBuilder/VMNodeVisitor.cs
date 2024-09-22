@@ -129,6 +129,10 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.LoadOrStoreRegister, inst, state.MethodIndex);
                     }
+                    if (inst.OpCode.Code.ToString().StartsWith("Conv_"))
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.ConvertNumber, inst, state.MethodIndex);
+                    }
                     if (inst.OpCode.Code == CilCode.Add)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Add, inst, state.MethodIndex);
@@ -362,6 +366,11 @@ namespace RegiVM.VMBuilder
                         // Return the register that it is stored to.
                         // But why would I return anything when the stack is empty after stloc??
                         //return storeInst.Reg1;
+                    }
+                    if (inst.OpCode.Code.ToString().StartsWith("Conv_"))
+                    {
+                        var convInst = new ConvertNumberInstruction(state, inst);
+                        state.InstructionBuilder.Add(convInst, inst, state.MethodIndex);
                     }
                     // TODO: Combine into one math instruction, or use some reflection hacking to get the type name.
                     if (inst.OpCode.Code == CilCode.Add)

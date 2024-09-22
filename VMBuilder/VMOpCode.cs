@@ -27,6 +27,7 @@ namespace RegiVM.VMBuilder
         public ulong EndFinally { get; set; } = 0x17000UL;
         public ulong JumpCall { get; set; } = 0x18000UL;
         public ulong Duplicate { get; set; } = 0x19000UL;
+        public ulong ConvertNumber { get; set; } = 0x20000UL;
         public void RandomizeAll()
         {
             Random r = new Random();

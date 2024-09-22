@@ -2,17 +2,38 @@
 using RegiVM.VMBuilder;
 using RegiVM.VMRuntime;
 using RegiVM.VMRuntime.Handlers;
+using System.Linq.Expressions;
 
 namespace RegiVM
 {
     public static class Program
     {
+        public class InstanceCreationTest
+        {
+            public int Hello { get; set; }
+            public int Bye { get; set; }
+            public InstanceCreationTest(int bye)
+            {
+                Hello = 30;
+                Bye = bye;
+            }
+        }
         internal static ByteArrayKey GetKey(this ulong val)
         {
             return new ByteArrayKey(BitConverter.GetBytes(val));
         }
         public static void Main(string[] args)
         {
+            //var ctorInfo = typeof(InstanceCreationTest).GetConstructors()[0];
+            //var mdToken = ctorInfo.MetadataToken;
+
+            //var ctorParam = Expression.Parameter(typeof(int));
+            //var exprNew = Expression.New(
+            //    (System.Reflection.ConstructorInfo)typeof(Program).Module.ResolveMethod(mdToken)!, 
+            //    [ctorParam]);
+            //var lambda = Expression.Lambda(exprNew, [ctorParam]).Compile();
+            //var instanceOfClass = lambda.DynamicInvoke(123);
+
             //Stopwatch sw = new Stopwatch();
             //sw.Start();
             //ActionDictionary<ulong> hello = new ActionDictionary<ulong>(10);
@@ -70,6 +91,7 @@ namespace RegiVM
             vm.OpCodeHandlers.Add(compiler.OpCodes.Comparator, InstructionHandlers.Comparator);
             vm.OpCodeHandlers.Add(compiler.OpCodes.JumpCall, InstructionHandlers.JumpCall);
             vm.OpCodeHandlers.Add(compiler.OpCodes.Duplicate, InstructionHandlers.DuplicateRegister);
+            vm.OpCodeHandlers.Add(compiler.OpCodes.ConvertNumber, InstructionHandlers.ConvertNumber);
 
 
             var actualResult = TestProgram.Call1(10, 60);

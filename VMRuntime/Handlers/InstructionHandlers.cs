@@ -266,18 +266,14 @@ namespace RegiVM.VMRuntime.Handlers
             tracker += 4;
 
             // Add param values.
-            List<byte[]> paramValues = new List<byte[]>();
+            Dictionary<int, object> parameters = new Dictionary<int, object>();
             for (int i = 0; i < numParams; i++)
             {
+                DataType paramDt = t.ReadDataType(d, ref tracker);
                 byte[] paramRegName = t.ReadBytes(d, ref tracker, out int _);
-                paramValues.Add(h[new ByteArrayKey(paramRegName)]);
-            }
-
-            Dictionary<int, object> parameters = new Dictionary<int, object>();
-            for (int i = 0; i < paramValues.Count; i++)
-            {
-                byte[] paramVal = paramValues[i];
-                parameters.Add(i, paramVal);
+                var paramValue = h[new ByteArrayKey(paramRegName)];
+                // TODO: Doing this means that every single reg MUST have a data type associated if it is a primitive type.
+                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : paramValue);
             }
 
             ByteArrayKey returnRegKey = default;
@@ -363,6 +359,110 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
+        internal static int ConvertNumber(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+                                       Dictionary<int, object> _)
+        {
+            Console.WriteLine("- [CONVERT NUMBER]");
+            int tracker = 0;
+
+            DataType fromDatatype = t.ReadDataType(d, ref tracker);
+            DataType toDatatype = t.ReadDataType(d, ref tracker);
+
+            var fromRegKey = new ByteArrayKey(t.ReadBytes(d, ref tracker, out var _));
+            var toRegKey = new ByteArrayKey(t.ReadBytes(d, ref tracker, out var _));
+
+            bool throwOverflowException = d[tracker++] == 1 ? true : false;
+            bool isUnsignedFrom = d[tracker++] == 1 ? true : false;
+
+            object fromValue = t.GetNumberObject(fromDatatype, h[fromRegKey]);
+
+            try
+            {
+                switch (toDatatype)
+                {
+                    case DataType.Int32:
+                        {
+                            var res = Convert.ToInt32(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.UInt32:
+                        {
+                            var res = Convert.ToUInt32(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.Int64:
+                        {
+                            var res = Convert.ToInt64(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.UInt64:
+                        {
+                            var res = Convert.ToUInt64(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.Single:
+                        {
+                            var res = Convert.ToSingle(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.Double:
+                        {
+                            var res = Convert.ToDouble(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.Int8:
+                        {
+                            var res = Convert.ToSByte(fromValue);
+                            // Save.
+                            h[toRegKey] = [(byte)res];
+                        }
+                        break;
+                    case DataType.UInt8:
+                        {
+                            var res = Convert.ToByte(fromValue);
+                            // Save.
+                            h[toRegKey] = [res];
+                        }
+                        break;
+                    case DataType.UInt16:
+                        {
+                            var res = Convert.ToUInt16(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                    case DataType.Int16:
+                        {
+                            var res = Convert.ToInt16(fromValue);
+                            // Save.
+                            h[toRegKey] = BitConverter.GetBytes(res);
+                        }
+                        break;
+                }
+            }
+            catch (OverflowException)
+            {
+                // If we should throw, throw it to the caller.
+                if (throwOverflowException)
+                {
+                    throw;
+                }
+            }
+            return tracker;
+        }
+
         internal static int NumberLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                        Dictionary<int, object> _)
         {
@@ -406,8 +506,12 @@ namespace RegiVM.VMRuntime.Handlers
 
             DataType paramDataType = (DataType)d[tracker++];
             object paramData = p[paramOffset];
-            
+
             byte[] endResult = t.ConvertParameter(paramDataType, paramData);
+            if (endResult == null)
+            {
+                endResult = t.ConvertObjectToHeap(paramData);
+            }
 
             ByteArrayKey regName = new ByteArrayKey(d.Skip(tracker).ToArray());
             tracker += regName.Bytes.Length;

@@ -99,13 +99,6 @@ namespace RegiVM.VMBuilder.Registers
                 OriginalOffset = inst.Offset;
                 LastOffsetUsed = inst.Offset;
             }
-            if (inst.OpCode.Code == CilCode.Ldstr)
-            {
-                CurrentData = Encoding.UTF8.GetBytes((string)inst.Operand!);
-                DataType = DataType.String;
-                OriginalOffset = inst.Offset;
-                LastOffsetUsed = inst.Offset;
-            }
             return this;
         }
     }

@@ -232,6 +232,23 @@ namespace RegiVM.VMRuntime
             };
         }
 
+        internal ByteArrayKey GetTempObjectKey()
+        {
+            return new ByteArrayKey(Guid.NewGuid().ToByteArray());
+        }
+
+        internal byte[] ConvertObjectToHeap(object obj)
+        {
+            ByteArrayKey objKey = GetTempObjectKey();
+            ObjectHeap.Add(objKey, obj);
+            return objKey.Bytes;
+        }
+
+        internal object GetObject(byte[] possibleKey)
+        {
+            return ObjectHeap[new ByteArrayKey(possibleKey)];
+        }
+
         internal byte[] ConvertParameter(DataType dataType, object paramData)
         {
             if (paramData.GetType() == typeof(byte[]))
@@ -250,7 +267,7 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.GetBytes((UInt16)paramData),
                 DataType.Single => BitConverter.GetBytes((Single)paramData),
                 DataType.Double => BitConverter.GetBytes((Double)paramData),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
+                DataType.Unknown => null!
             };
         }
 
