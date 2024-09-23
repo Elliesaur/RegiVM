@@ -16,6 +16,8 @@
 
 
 ### How does call, callvirt, newobj work?
+- This section is subject to change. Using method tokens to resolve a method at runtime may be moved to more secure methods later.
+
 #### Inline Calls
 - Where possible, calls are inlined. 
 	- A call can be inlined if it is not referenced by other methods aside from the current method being processed.
