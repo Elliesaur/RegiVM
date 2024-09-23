@@ -110,6 +110,7 @@ namespace RegiVM.VMBuilder
                 }
                 else
                 {
+
                 }
             }
 
@@ -202,7 +203,9 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst, state.MethodIndex);
                     }
-                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    if ((inst.OpCode.Code == CilCode.Call ||
+                        inst.OpCode.Code == CilCode.Callvirt ||
+                        inst.OpCode.Code == CilCode.Newobj) && inst.Operand is IMethodDefOrRef)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpCall, inst, state.MethodIndex);
                     }
@@ -241,7 +244,7 @@ namespace RegiVM.VMBuilder
                         // Jump.
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpBool, inst, state.MethodIndex);
                     }
-                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Newobj) && inst.Operand is IMethodDefOrRef)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.JumpCall, inst, state.MethodIndex);
                     }
@@ -552,34 +555,29 @@ namespace RegiVM.VMBuilder
                         var switchInst = new JumpBoolInstruction(state, inst, offsets.ToArray());
                         state.InstructionBuilder.Add(switchInst, inst, state.MethodIndex);
                     }
-                    if ((inst.OpCode.Code == CilCode.Call || inst.OpCode.Code == CilCode.Callvirt) && inst.Operand is IMethodDefOrRef)
+                    if ((inst.OpCode.Code == CilCode.Call ||
+                        inst.OpCode.Code == CilCode.Callvirt || 
+                        inst.OpCode.Code == CilCode.Newobj) && inst.Operand is IMethodDefOrRef)
                     {
-                        // TODO: Callvirt support.
-                        if (inst.OpCode.Code == CilCode.Callvirt)
-                        {
-                            throw new NotImplementedException("Not implemented callvirt yet.");
-                        }
-                        var methodDef = inst.Operand as MethodDefinition;
-                        if (methodDef == null)
-                        {
-                            // Method ref...?
-                            throw new NotImplementedException("Not implemented external calls yet.");
-                        }
+                        var methodRef = (IMethodDefOrRef)inst.Operand;
 
-                        var canInline = state.ViableInlineTargets.Contains(methodDef);
+                        var canInline = state.ViableInlineTargets.Contains(methodRef);
+                        int methodIndexToCall = -1;
                         if (!canInline)
                         {
-                            throw new NotImplementedException("Not implemented non-inlineable calls yet.");
+                            methodIndexToCall = methodRef.MetadataToken.ToInt32();
+                        }
+                        else
+                        {
+                            // We find the method index to call based on the processing "line" of the methods to inline.
+                            methodIndexToCall = state.ViableInlineTargets.IndexOf(methodRef);
+                            // Make sure the first instruction of every method index is added as a used mapping.
+                            // At runtime, the call to the method index can then happen based on the instruction mapping.
+                            state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
                         }
 
-                        // We find the method index to call based on the processing "line" of the methods to inline.
-                        var methodIndexToCall = state.ViableInlineTargets.IndexOf(methodDef);
-                        // Make sure the first instruction of every method index is added as a used mapping.
-                        // At runtime, the call to the method index can then happen based on the instruction mapping.
-                        state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
-
                         // We make a new jump call and specify the method index to call.
-                        var jumpCallInst = new JumpCallInstruction(state, inst, methodDef, methodIndexToCall, canInline);
+                        var jumpCallInst = new JumpCallInstruction(state, inst, methodRef, methodIndexToCall, canInline);
                         state.InstructionBuilder.Add(jumpCallInst, inst, state.MethodIndex);
                     }
                     return null!;
@@ -612,11 +610,12 @@ namespace RegiVM.VMBuilder
                         // If this fails we're pretty fucked.
                         var param = (Parameter)inst.Operand!;
                         var typeName = param.ParameterType.ToTypeDefOrRef().Name;
-                        if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
+                        DataType dataType = DataType.Unknown;
+                        if (Enum.TryParse(typeof(DataType), typeName, true, out var dataTypeOut))
                         {
-                            throw new Exception($"CANNOT PROCESS TYPE NAME FOR PARAMETER! {typeName}");
+                            dataType = (DataType)dataTypeOut;
                         }
-                        var ldargInst = new ParamLoadInstruction(state, param.Index, (DataType)dataType, param, inst);
+                        var ldargInst = new ParamLoadInstruction(state, param.MethodSignatureIndex, dataType, param, inst);
                         state.InstructionBuilder.Add(ldargInst, inst, state.MethodIndex);
                         
                         // Load the tempreg where the param is existing.
@@ -697,29 +696,28 @@ namespace RegiVM.VMBuilder
                     }
 
                     // Cannot have Callvirt without arguments...
-                    if ((inst.OpCode.Code == CilCode.Call) && inst.Operand is IMethodDefOrRef)
+                    if ((inst.OpCode.Code == CilCode.Call ||
+                        inst.OpCode.Code == CilCode.Newobj) && inst.Operand is IMethodDefOrRef)
                     {
-                        var methodDef = inst.Operand as MethodDefinition;
-                        if (methodDef == null)
-                        {
-                            // Method ref...?
-                            throw new NotImplementedException("Not implemented external calls yet.");
-                        }
+                        var methodRef = (IMethodDefOrRef)inst.Operand;
 
-                        var canInline = state.ViableInlineTargets.Contains(methodDef);
+                        var canInline = state.ViableInlineTargets.Contains(methodRef);
+                        int methodIndexToCall = -1;
                         if (!canInline)
                         {
-                            throw new NotImplementedException("Not implemented non-inlineable calls yet.");
+                            methodIndexToCall = methodRef.MetadataToken.ToInt32();
+                        }
+                        else
+                        {
+                            // We find the method index to call based on the processing "line" of the methods to inline.
+                            methodIndexToCall = state.ViableInlineTargets.IndexOf(methodRef);
+                            // Make sure the first instruction of every method index is added as a used mapping.
+                            // At runtime, the call to the method index can then happen based on the instruction mapping.
+                            state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
                         }
 
-                        // We find the method index to call based on the processing "line" of the methods to inline.
-                        var methodIndexToCall = state.ViableInlineTargets.IndexOf(methodDef);
-                        // Make sure the first instruction of every method index is added as a used mapping.
-                        // At runtime, the call to the method index can then happen based on the instruction mapping.
-                        state.InstructionBuilder.AddUsedMapping(0, methodIndexToCall);
-
                         // We make a new jump call and specify the method index to call.
-                        var jumpCallInst = new JumpCallInstruction(state, inst, methodDef, methodIndexToCall, canInline);
+                        var jumpCallInst = new JumpCallInstruction(state, inst, methodRef, methodIndexToCall, canInline);
                         state.InstructionBuilder.Add(jumpCallInst, inst, state.MethodIndex);
                     }
                     return reg;

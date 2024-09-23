@@ -266,6 +266,8 @@ namespace RegiVM
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
         public static int Call1(int arg1, int arg2)
         {
+            var cool = new TestInstanceClass();
+            long test = cool.Hello(arg1);
             try
             {
                 int a = arg1 + 2;
@@ -282,6 +284,19 @@ namespace RegiVM
             {
                 int hello = 1337;
             }
+        }
+    }
+
+    public class TestInstanceClass
+    {
+        public int x;
+        public TestInstanceClass()
+        {
+
+        }
+        public long Hello(int y)
+        {
+            return (long)(y + 30000);
         }
     }
 }

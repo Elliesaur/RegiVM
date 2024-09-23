@@ -27,23 +27,39 @@ namespace RegiVM.VMBuilder.Instructions
             MethodIndexToCall = methodIndexToCall;
             IsInlineCall = isInlineCall;
 
+            
             var paramCount = target.Signature!.GetTotalParameterCount();
+            if (inst.OpCode.Code == CilCode.Newobj)
+            {
+                // Remove one parameter for newobj .ctor calls.
+                paramCount--;
+            }
             for (int i = 0; i < paramCount; i++)
             {
-                ArgRegs.Add((Registers.Temporary.Pop()));
+                ArgRegs.Add(Registers.Temporary.Pop());
             }
             // Reverse order for proper assignments.
             ArgRegs.Reverse();
 
-            if (target.Signature!.ReturnsValue)
+            if (inst.OpCode.Code == CilCode.Newobj)
             {
-                ReturnReg1 = (Registers.ForTemp());
+                // Newobj always pushes a value to stack.
+                ReturnReg1 = Registers.ForTemp();
+                ReturnReg1.DataType = DataType.Unknown;
+            }
+            else if (target.Signature!.ReturnsValue)
+            {
+                ReturnReg1 = Registers.ForTemp();
                 var typeName = target.Signature!.ReturnType.ToTypeDefOrRef().Name;
                 if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
                 {
-                    throw new Exception($"CANNOT PROCESS TYPE NAME FOR CALL! {typeName}");
+                    // Object return type likely.
+                    ReturnReg1.DataType = DataType.Unknown;
                 }
-                ReturnReg1.DataType = (DataType)dataType;
+                else
+                {
+                    ReturnReg1.DataType = (DataType)dataType;
+                }
             }
 
             ByteCode = ToByteArray();

@@ -84,8 +84,9 @@ namespace RegiVM.VMBuilder
                 writer.Write(originalStartMethod.Signature!.GetTotalParameterCount());
 
                 // Only write used mapping data, that way we do not reveal a whole lot about our internal workings.
-                int totalCount = _usedInstructionIndexes.Count();
-                writer.Write(totalCount);
+                // Always skip where method index > 0 && index is 0.
+                //int totalCount = _usedInstructionIndexes.Where(x => !(x.Item1 > 0 && x.Item2 == 0)).Count();
+                //writer.Write(totalCount);
                 // We make sure it is unique.
                 // We then shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
                 var currentOffset = 0;
@@ -99,7 +100,7 @@ namespace RegiVM.VMBuilder
                     diff = item.Value.Item2 - item.Value.Item1;
 
                     Console.WriteLine($"Current {currentOffset}, Previous {prevOffset}");
-                    if (currentOffset == 0 && prevOffset != 0)
+                    if (currentOffset == 0 && prevOffset != 0 && !recalculate)
                     {
                         // Method change.
                         _instructionOffsetMappings[item.Key] = new Tuple<int, int>(prev.Value.Item2, prev.Value.Item2 + diff);
@@ -122,20 +123,27 @@ namespace RegiVM.VMBuilder
                     prevOffset = currentOffset;
                     prev = item;
                 }
-                
-                foreach (var instIndex in _usedInstructionIndexes.Shuffle())
-                {
-                    var mappingItem = _instructionOffsetMappings[instIndex];
 
-                    // Method Index... TODO: Figure out how to remove this! No need for it :)
-                    //writer.Write(instIndex.Item1);
+                //foreach (var instIndex in _usedInstructionIndexes.Shuffle())
+                //{
+                //    var mappingItem = _instructionOffsetMappings[instIndex];
+
+                //    if (instIndex.Item1 > 0 && instIndex.Item2 == 0)
+                //    {
+                //        // We do not need to include these mappings, they are never used.
+                //        // Raw offset is used in jump_call instruction.
+                //        continue;
+                //    }
+
+                //    // Method Index... TODO: Figure out how to remove this! No need for it :)
+                //    //writer.Write(instIndex.Item1);
                     
-                    // Instruction Index
-                    writer.Write(instIndex.Item2);
+                //    // Instruction Index
+                //    writer.Write(instIndex.Item2);
 
-                    writer.Write(mappingItem.Item1);
-                    writer.Write(mappingItem.Item2);
-                }
+                //    writer.Write(mappingItem.Item1);
+                //    writer.Write(mappingItem.Item2);
+                //}
 
                 // Write instruction data. Must write method 0, then 1 after method 0.
                 for (int i = 0; i <= _compiler.MethodIndex; i++)
@@ -143,7 +151,7 @@ namespace RegiVM.VMBuilder
                     foreach (var instruction in _instructions[i])
                     {
                         writer.Write(instruction.OpCode);
-                        if (instruction is JumpCallInstruction)
+                        if (instruction is JumpCallInstruction && ((JumpCallInstruction)instruction).IsInlineCall)
                         {
                             var operandBytes = instruction.ByteCode;
 
@@ -175,6 +183,101 @@ namespace RegiVM.VMBuilder
                                 writer.Write(newOperandBytes);
                             }
                             
+                        }
+                        else if (instruction is JumpBoolInstruction)
+                        {
+                            var operandBytes = instruction.ByteCode;
+
+                            // Patch offset.
+                            byte[] newOperandBytes = new byte[operandBytes.Length];
+                            using (var mStreamO = new MemoryStream(newOperandBytes))
+                            using (var mStream = new MemoryStream(operandBytes))
+                            using (var bReader = new BinaryReader(mStream))
+                            using (var bWriter = new BinaryWriter(mStreamO))
+                            {
+                                var countOffsets = bReader.ReadInt32();
+                                bWriter.Write(countOffsets);
+
+                                for (int x = 0; x < countOffsets; x++)
+                                {
+                                    var index = bReader.ReadInt32();
+
+                                    // Read the real offset.
+                                    var branchTargetOffset = _instructionOffsetMappings[new Tuple<int, int>(i, index)].Item1;
+                                    bWriter.Write(branchTargetOffset);
+                                }
+                                
+                                try
+                                {
+                                    while (true)
+                                        bWriter.Write(bReader.ReadByte());
+                                }
+                                catch (Exception)
+                                {
+                                    // Ugh, yea I could handle it properly.
+                                }
+                                writer.Write(newOperandBytes.Length);
+                                writer.Write(newOperandBytes);
+                            }
+                        }
+                        else if (instruction is StartBlockInstruction)
+                        {
+                            var operandBytes = instruction.ByteCode;
+
+                            // Patch offset.
+                            byte[] newOperandBytes = new byte[operandBytes.Length];
+                            using (var mStreamO = new MemoryStream(newOperandBytes))
+                            using (var mStream = new MemoryStream(operandBytes))
+                            using (var bReader = new BinaryReader(mStream))
+                            using (var bWriter = new BinaryWriter(mStreamO))
+                            {
+                                // BlockType.
+                                bWriter.Write(bReader.ReadByte());
+
+                                var countHandlers = bReader.ReadInt32();
+                                bWriter.Write(countHandlers);
+
+                                for (int x = 0; x < countHandlers; x++)
+                                {
+                                    // Type of handler.
+                                    bWriter.Write(bReader.ReadByte());
+
+                                    // Handler index start
+                                    var handlerIndex = bReader.ReadInt32();
+
+                                    // Filter index start.
+                                    var filterIndex = bReader.ReadInt32();
+
+                                    // Read the real offsets.
+                                    var handlerOffset = handlerIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, handlerIndex)].Item1 : 0;
+                                    var filterOffset = filterIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, filterIndex)].Item1 : 0;
+                                    bWriter.Write(handlerOffset);
+                                    bWriter.Write(filterOffset);
+                                    // Read rest of stuff.
+                                    // Exception type mdtkn
+                                    bWriter.Write(bReader.ReadUInt32());
+                                    
+                                    // Exception handler object key.
+                                    var objKeyLength = bReader.ReadInt32();
+                                    bWriter.Write(objKeyLength);
+
+                                    bWriter.Write(bReader.ReadBytes(objKeyLength));
+                                    // Id
+                                    bWriter.Write(bReader.ReadInt32());
+                                }
+
+                                try
+                                {
+                                    while (true)
+                                        bWriter.Write(bReader.ReadByte());
+                                }
+                                catch (Exception)
+                                {
+                                    // Ugh, yea I could handle it properly.
+                                }
+                                writer.Write(newOperandBytes.Length);
+                                writer.Write(newOperandBytes);
+                            }
                         }
                         else
                         {
@@ -238,6 +341,9 @@ namespace RegiVM.VMBuilder
                 case CilCode.Blt_Un:
                 case CilCode.Ble_Un:
                 case CilCode.Bge_Un:
+                case CilCode.Call:
+                case CilCode.Callvirt:
+                case CilCode.Newobj:
                 case CilCode.Switch:
 
                 // Prefix 7 is used to know when a "startblock" occurs.

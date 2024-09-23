@@ -17,7 +17,7 @@ namespace RegiVM.VMBuilder.Instructions
         {
             Inst = inst;
             Registers = compiler.RegisterHelper;
-            OpCode = compiler.OpCodes.Duplicate;
+            OpCode = compiler.OpCodes.ConvertNumber;
 
             var num = Registers.Temporary.Pop();
             FromReg1 = num;

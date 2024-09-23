@@ -1,6 +1,8 @@
 ﻿using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
 using System.Diagnostics;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace RegiVM.VMRuntime.Handlers
 {
@@ -136,7 +138,7 @@ namespace RegiVM.VMRuntime.Handlers
                     // ECMA: if value is less than n execution is transferred to the valueths target.
                     // value of 1 takes the second target, 0 takes the first target.
                     var option = jumpOffsets[value];
-                    tracker = t.InstructionOffsetMappings[option].Item1;
+                    tracker = option;
                     return tracker;
                 }
                 else
@@ -150,7 +152,7 @@ namespace RegiVM.VMRuntime.Handlers
                 Console.WriteLine("- > Regular Jump");
 
                 int branchToOffset = jumpOffsets[0];
-                int branchToOffsetValue = t.InstructionOffsetMappings[branchToOffset].Item1;
+                int branchToOffsetValue = branchToOffset;
 
                 if (isLeaveProtected && t.ActiveExceptionHandler != null && t.ActiveExceptionHandler.Type != VMBlockType.Finally && t.ActiveExceptionHandler.Id != 0)
                 {
@@ -251,11 +253,6 @@ namespace RegiVM.VMRuntime.Handlers
             bool isInline = d.Skip(tracker).Take(1).ToArray()[0] == 1 ? true : false;
             tracker++;
 
-            if (!isInline)
-            {
-                throw new NotImplementedException("Non-inline call not implemented.");
-            }
-
             int methodOffsetToCall = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
             tracker += 4;
 
@@ -284,16 +281,82 @@ namespace RegiVM.VMRuntime.Handlers
                 returnRegKey = new ByteArrayKey(returnRegName);
             }
 
-            t.MethodSignatures.Push(new VMMethodSig()
+            if (!isInline)
             {
-                PreviousIP = BitConverter.ToInt32(h[t.INSTRUCTION_POINTER]) + tracker + 12 /* 12 is for 8 + 4 opcode + operand length */,
-                ParamCount = numParams,
-                ParamValues = parameters,
-                HasReturnValue = hasReturnValue,
-                ReturnRegister = returnRegKey
-            });
-            
-            tracker = methodOffsetToCall;
+                int methodToken = methodOffsetToCall;
+
+                var methodBase = typeof(RegiVMRuntime).Module.ResolveMethod(methodToken)!;
+                var hasThis = methodBase!.CallingConvention.HasFlag(CallingConventions.HasThis);
+
+                // TODO: Generics! By Ref! Expression trees cannot support:
+                /*
+                    https://learn.microsoft.com/en-us/dotnet/csharp/advanced-topics/expression-trees/#limitations
+                */
+                var instance = hasThis && methodBase is not ConstructorInfo ? parameters[0] : null;
+                var invokeParams = parameters.Skip(1).Select(x => x.Value).ToArray();
+                var eInvokeParams = new ParameterExpression[invokeParams.Length];
+                for (int i = 0; i < invokeParams.Length; i++)
+                {
+                    eInvokeParams[i] = Expression.Parameter(invokeParams[i].GetType());
+                }
+
+                Expression eCall = default!;
+                if (methodBase is MethodInfo)
+                {
+                    // Call/callvirt.
+                    eCall = Expression.Call(instance != null ? Expression.Constant(instance) : null, (MethodInfo)methodBase, eInvokeParams);
+                }
+                else if (methodBase is ConstructorInfo)
+                {
+                    // Newobj.
+                    eCall = Expression.New((ConstructorInfo)methodBase, eInvokeParams);
+                }
+                var del = Expression.Lambda(eCall, eInvokeParams).Compile();
+                var result = del.DynamicInvoke(invokeParams);
+                // Instead of the below:
+                //var result = methodInfo.Invoke(instance, invokeParams);
+                if (hasReturnValue)
+                {
+                    if (result != null && result.GetType().IsPrimitive)
+                    {
+                        // TODO: Avoid dynamic, switch on type of primitive?
+                        if (!h.ContainsKey(returnRegKey))
+                        {
+                            h.Add(returnRegKey, BitConverter.GetBytes((dynamic)result));
+                        }
+                        else
+                        {
+                            h[returnRegKey] = BitConverter.GetBytes((dynamic)result);
+                        }
+                    }
+                    else
+                    {
+                        // It is an object, treat it like object to heap store in object table.
+                        var objKey = t.ConvertObjectToHeap(result);
+                        if (!h.ContainsKey(returnRegKey))
+                        {
+                            h.Add(returnRegKey, objKey);
+                        }
+                        else
+                        {
+                            h[returnRegKey] = objKey;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                t.MethodSignatures.Push(new VMMethodSig()
+                {
+                    PreviousIP = BitConverter.ToInt32(h[t.INSTRUCTION_POINTER]) + tracker + 12 /* 12 is for 8 + 4 opcode + operand length */,
+                    ParamCount = numParams,
+                    ParamValues = parameters,
+                    HasReturnValue = hasReturnValue,
+                    ReturnRegister = returnRegKey
+                });
+
+                tracker = methodOffsetToCall;
+            }
             
             return tracker;
         }
@@ -583,18 +646,18 @@ namespace RegiVM.VMRuntime.Handlers
                 handler.Type = (VMBlockType)d.Skip(tracker).Take(1).ToArray()[0];
                 tracker++;
 
-                int handlerOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                int handlerOffsetStart = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
                 tracker += 4;
-                if (handlerOffsetStartIndex > 0)
+                if (handlerOffsetStart > 0)
                 {
-                    handler.HandlerOffsetStart = t.InstructionOffsetMappings[handlerOffsetStartIndex].Item1;
+                    handler.HandlerOffsetStart = handlerOffsetStart;
                 }
 
-                int filterOffsetStartIndex = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                int filterOffsetStart = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
                 tracker += 4;
-                if (filterOffsetStartIndex > 0)
+                if (filterOffsetStart > 0)
                 {
-                    handler.FilterOffsetStart = t.InstructionOffsetMappings[filterOffsetStartIndex].Item1;
+                    handler.FilterOffsetStart = filterOffsetStart;
                 }
 
                 uint exceptionTypeToken = BitConverter.ToUInt32(d.Skip(tracker).Take(4).ToArray());

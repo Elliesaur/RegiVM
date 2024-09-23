@@ -65,7 +65,7 @@ namespace RegiVM.VMBuilder
         public ControlFlowGraph<CilInstruction> MethodStaticFlowGraph { get; private set; }
         public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
         public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
-        public List<MethodDefinition> ViableInlineTargets { get; } = new List<MethodDefinition>();
+        public List<IMethodDefOrRef> ViableInlineTargets { get; } = new List<IMethodDefOrRef>();
         public VMCompiler()
         {
             RegisterHelper = null;
@@ -115,7 +115,7 @@ namespace RegiVM.VMBuilder
             
             foreach (var processMethod in ViableInlineTargets)
             {
-                CurrentMethod = processMethod;
+                CurrentMethod = (MethodDefinition)processMethod;
 
                 var sfg = CurrentMethod.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
 

@@ -8,16 +8,6 @@ namespace RegiVM
 {
     public static class Program
     {
-        public class InstanceCreationTest
-        {
-            public int Hello { get; set; }
-            public int Bye { get; set; }
-            public InstanceCreationTest(int bye)
-            {
-                Hello = 30;
-                Bye = bye;
-            }
-        }
         internal static ByteArrayKey GetKey(this ulong val)
         {
             return new ByteArrayKey(BitConverter.GetBytes(val));

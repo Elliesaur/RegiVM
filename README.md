@@ -6,10 +6,13 @@
 - Registers are byte arrays of any length (currently converted from a string to Utf8 bytes), meaning funky things can be done.
 
 ## How it workies?
-- VM Data is all converted on compile to a byte array.
-- VM Data is loaded into a "heap" (it isn't an actual heap). 
-- Step through each OpCode, send to handler for that OpCode.
-- Any reference to a register is loaded from the heap. 
+1. Load .NET executable using AsmResolver.
+1. Compile .NET method definition to RegiVM language and output as byte array.
+1. Copy runtime implementation and patch method as stub that calls runtime with byte array.
+1. At runtime of program, VM byte array is loaded into a heap-like object. 
+1. VM runtime steps through each RegiVM OpCode and finds dispatch handler for it.
+1. Any reference to a register is loaded from the heap as necessary.
+1. Objects are stored in a separate heap with a key stored in the heap to reference it.
 
 ## Example Output
 ### Original C# Code:
@@ -504,7 +507,7 @@ This is very basic for now, more will be added in time.
 ## Control Flow
 - JUMP_BOOL `<offset(s)-to-jump-to> <is-leaving-protected-code> <should-invert> <reg-to-check-for-boolean>` (for all branches, leaves, switches)
 - START_BLOCK `<handlers-as-objects>`
-- JUMP_CALL
+- JUMP_CALL (handles inlined calls, external calls, callvirt, and newobj)
 - END_FINALLY
 
 ## Maths
@@ -549,6 +552,8 @@ This is very basic for now, more will be added in time.
 - ble.un
 - switch
 - call
+- callvirt
+- newobj
 - dup
 - conv_* (all however many there are)
 - nop (not supported, never will be)
@@ -558,12 +563,12 @@ This is very basic for now, more will be added in time.
 - [X] Refine check for branching into a protected region, current it might be that a branch statement is included whilst inside a protected region and the target is changed to be the start of the region when it is simply branching within the same region. Check if the destination is within the same region perhaps?
 - [X] Add support for switch statements
 - [X] Add support for basic method def calls that return supported data types and restructure VM runtime for jump to call support. Particularly, parameter offsets, returns and so on.
-- [ ] Add support for other calls that are not inlined.
+- [X] Add support for other calls that are not inlined.
 - [X] Add support for dup
 - [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
 - [ ] Add support for storing into parameters (starg).
 - [ ] Add support for general objects and passing them as params/loading them onto registers.
-- [ ] Add support for new objects.
+- [X] Add support for new objects.
 - [ ] Add support for throwing exceptions.
 - [X] Add support for converting between number data types (conv...).
 - [ ] Additional testing for exception handlers.

@@ -32,7 +32,7 @@ namespace RegiVM.VMRuntime
         // Track instruction offset mappings for branch statements.
         // Item1 = start offset (IP).
         // Item2 = end offset (IP end after tracking).
-        public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
+        //public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -65,47 +65,62 @@ namespace RegiVM.VMRuntime
                     ParamCount = numParams
                 });
 
-                var mappingLength = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                track += 4;
-                for (var i = 0; i < mappingLength; i++)
-                {
-                    // TODO: Remove this, how!?
-                    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    //track += 4;
+                //var mappingLength = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //track += 4;
+                //for (var i = 0; i < mappingLength; i++)
+                //{
+                //    // TODO: Remove this, how!?
+                //    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    //track += 4;
 
-                    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                //    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
 
-                    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                //    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
 
-                    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                //    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
 
-                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
-                }
+                //    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                //}
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
             else
             {
-                var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
-                var track = 4;
-                for (var i = 0; i < mappingLength; i++) 
+                int track = 0;
+
+                bool hasReturnValue = data.Skip(track).Take(1).ToArray()[0] == 1 ? true : false;
+                track += 1;
+
+                int numParams = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                track += 4;
+
+                MethodSignatures.Push(new VMMethodSig
                 {
-                    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    //track += 4;
+                    HasReturnValue = hasReturnValue,
+                    ReturnRegister = hasReturnValue ? RETURN_REGISTER : default,
+                    ParamCount = numParams
+                });
 
-                    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                //var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
+                //var track = 4;
+                //for (var i = 0; i < mappingLength; i++) 
+                //{
+                //    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    //track += 4;
 
-                    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
+                //    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
 
-                    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                    track += 4;
-                    
-                    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
-                }
+                //    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
+
+                //    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                //    track += 4;
+
+                //    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
+                //}
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
             for (int i = 0; i < parameters.Length; i++)
