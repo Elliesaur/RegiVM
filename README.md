@@ -14,6 +14,43 @@
 1. Any reference to a register is loaded from the heap as necessary.
 1. Objects are stored in a separate heap with a key stored in the heap to reference it.
 
+
+### How does call, callvirt, newobj work?
+#### Inline Calls
+- Where possible, calls are inlined. 
+	- A call can be inlined if it is not referenced by other methods aside from the current method being processed.
+- Inline calls are represented as a jump to a new area of the byte array.
+	- A new method signature is pushed to a StackList (a stack with Remove support).
+	- The Instruction Pointer is updated to point to the "start" of the method.
+	- There is no header or trailer for an inlined method. It appears as one continuous instruction stream.
+
+Inline Format Example:
+```
+JUMP_CALL Inline:True Offset:1 Args:2 ReturnsValue?:True
+```
+- The offset represents (at runtime) the byte array offset where the method starts.
+- Method execution continues in the inlined method until a return is executed and at which point the IP returns to the previous IP + 1 instruction.
+
+#### External Calls
+- If a call cannot be inlined it is referenced by method token.
+- The method is executed by an Expression Tree dynamic method. 
+- This was done because it is something new that not many people have thought to do.
+- Alternatively, the standard reflection `.Invoke(instance, params)` could be used.
+
+External Format Example:
+```
+JUMP_CALL Inline:False Offset:100663308 Args:0 Ret?:True
+```
+
+#### New Objects
+- Creation of a new object follows the same process as an external call, except the `Expression.Call` is swapped for a `Expression.New`.
+
+New Object Format Example:
+```
+JUMP_CALL Inline:False Offset:100663308 Args:0 Ret?:True
+```
+
+
 ## Example Output
 ### Original C# Code:
 <details>
