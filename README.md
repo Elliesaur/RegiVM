@@ -1,5 +1,6 @@
 # RegiVM
 - Supports basic operations and exception handling.
+- Supports encrypting OpCodes + Operands of output, only decrypting when flow is correct.
 - Somewhat-register-based VM?
 - OpCodes are ulong.
 - Operands are byte arrays of any length.
@@ -611,6 +612,7 @@ This is very basic for now, more will be added in time.
 - [ ] Add support for throwing exceptions.
 - [X] Add support for converting between number data types (conv...).
 - [ ] Additional testing for exception handlers.
+- [X] Add support for encryption of bytecode.
 
 # Dependencies
 - The lovely [AsmResolver](https://github.com/Washi1337/AsmResolver).
