@@ -185,7 +185,7 @@ namespace RegiVM.VMRuntime
                 {
                     ip = track;
                 }
-                else if (isEncrypted && IP.Count < 2)
+                else if (IP.Count < 2)
                 {
                     // If it is encrypted but the first instruction, set it to += track due to it being unencrypted.
                     // This is entirely redundant when the instruction is encrypted due to the carved area.

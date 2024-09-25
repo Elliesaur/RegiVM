@@ -298,10 +298,7 @@ namespace RegiVM.VMBuilder
                         {
                             VMInstruction? instruction = _instructions[i][instIndex];
                             var mapping = _instructionOffsetMappings[new Tuple<int, int>(i, instIndex)];
-                            if (instIndex == 40 || instIndex == 41)
-                            {
 
-                            }
                             if (instruction.IsHandlerStart || (i == 0 && instIndex == 0))
                             {
                                 // First instruction!
