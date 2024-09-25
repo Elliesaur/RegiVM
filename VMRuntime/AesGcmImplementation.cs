@@ -1,7 +1,7 @@
 ﻿using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-namespace RegiVM
+namespace RegiVM.VMRuntime
 {
     public static class AesGcmImplementation
     {

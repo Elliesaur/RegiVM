@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Registers;
+using RegiVM.VMRuntime;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -7,6 +7,7 @@ using Echo.ControlFlow.Regions;
 using Microsoft.Win32;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
+using RegiVM.VMRuntime;
 using System.Reflection.Emit;
 
 namespace RegiVM.VMBuilder

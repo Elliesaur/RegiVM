@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
+using RegiVM.VMRuntime;
 using System;
 using System.Collections.Generic;
 using System.Linq;

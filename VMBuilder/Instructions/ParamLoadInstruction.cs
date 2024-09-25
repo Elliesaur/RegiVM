@@ -1,7 +1,7 @@
 ﻿using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Registers;
-using System.ComponentModel.DataAnnotations;
+using RegiVM.VMRuntime;
 
 namespace RegiVM.VMBuilder.Instructions
 {

@@ -1,5 +1,6 @@
 ﻿using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Registers;
+using RegiVM.VMRuntime;
 
 namespace RegiVM.VMBuilder.Instructions
 {

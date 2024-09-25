@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="VMRuntime\ShamirSecretSharingImplementation.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="AsmResolver">
       <HintPath>AsmResolver\artifacts\bin\AsmResolver.DotNet\debug_netstandard2.1\AsmResolver.dll</HintPath>
     </Reference>

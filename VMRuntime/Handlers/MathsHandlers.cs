@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using RegiVM.VMBuilder;
 using RegiVM.VMBuilder.Instructions;
-using RegiVM.VMRuntime;
 
 namespace RegiVM.VMRuntime.Handlers
 {
