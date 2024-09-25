@@ -10,10 +10,11 @@ namespace RegiVM.VMBuilder.Instructions
         public DataType NumType { get; }
         public CilInstruction Inst { get; }
         public VMRegister TempReg1 { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public NumLoadInstruction(VMCompiler compiler, object valueToLoad, DataType numType, CilInstruction inst)
         {
+            MethodIndex = compiler.MethodIndex;
             ValueToLoad = valueToLoad;
             NumType = numType;
             Inst = inst;

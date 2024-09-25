@@ -9,11 +9,12 @@ namespace RegiVM.VMBuilder.Instructions
         public int[] JumpOffsets { get; }
         public bool ShouldInvert { get; }
         public bool IsLeave { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
         public VMRegister TempReg1 { get; }
 
         public JumpBoolInstruction(VMCompiler compiler, CilInstruction inst, params int[] jumpOffsets)
         {
+            MethodIndex = compiler.MethodIndex;
             JumpOffsets = jumpOffsets;
 
             Registers = compiler.RegisterHelper;
@@ -31,6 +32,8 @@ namespace RegiVM.VMBuilder.Instructions
             {
                 IsLeave = true;
             }
+            // Add references to the indexes. They aren't "offsets" yet.
+            References.AddRange(jumpOffsets);
 
             ByteCode = ToByteArray();
         }

@@ -10,10 +10,11 @@ namespace RegiVM.VMBuilder.Instructions
         public override ulong OpCode { get; }
         public int ParamOffset { get; }
         public VMRegister TempReg1 { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public ParamLoadInstruction(VMCompiler compiler, int paramOffset, DataType paramDataType, Parameter param, CilInstruction inst)
         {
+            MethodIndex = compiler.MethodIndex;
             ParamOffset = paramOffset;
             
             Registers = compiler.RegisterHelper;

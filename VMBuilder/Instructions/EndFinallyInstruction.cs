@@ -3,10 +3,11 @@
     public class EndFinallyInstruction : VMInstruction
     {
         public override ulong OpCode { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public EndFinallyInstruction(VMCompiler compiler)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.EndFinally;
 

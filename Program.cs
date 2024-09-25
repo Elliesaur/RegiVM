@@ -2,7 +2,11 @@
 using RegiVM.VMBuilder;
 using RegiVM.VMRuntime;
 using RegiVM.VMRuntime.Handlers;
+using System.Diagnostics;
 using System.Linq.Expressions;
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace RegiVM
 {
@@ -12,8 +16,85 @@ namespace RegiVM
         {
             return new ByteArrayKey(BitConverter.GetBytes(val));
         }
+
         public static void Main(string[] args)
         {
+
+            var masterKeyOpCode = 1234546161531ul;
+            var opCodeBytes = BitConverter.GetBytes(masterKeyOpCode);
+            var currentInstOffset = 3411;
+            var callerInstOffset1 = 3339;
+            var callerInstOffset2 = 1234;
+            byte[] currentInstOperand = new byte[] { 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0x10, 0x12 };
+
+            // Our master key is actually a derived key due to the opCode bytes being only 8 bytes long.
+            var masterKey = Rfc2898DeriveBytes.Pbkdf2(opCodeBytes, BitConverter.GetBytes(currentInstOffset), 10000, HashAlgorithmName.SHA512, 32);
+            
+            var encryptedOperand = AesGcmImplementation.Encrypt(currentInstOperand, masterKey);
+
+            var encryptedKey1DerivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(callerInstOffset1), BitConverter.GetBytes(currentInstOffset), currentInstOffset, HashAlgorithmName.SHA512, 32);
+            var encryptedKey2DerivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(callerInstOffset2), BitConverter.GetBytes(currentInstOffset), currentInstOffset, HashAlgorithmName.SHA512, 32);
+            
+            var encryptedKey1 = AesGcmImplementation.Encrypt(masterKey, encryptedKey1DerivedKey);
+            var encryptedKey2 = AesGcmImplementation.Encrypt(masterKey, encryptedKey1DerivedKey);
+
+
+            // What is needed at runtime:
+            /* 
+             * - Previous offset
+             * - Current offset
+             * - Instruction opcode + operand to decrypt. The raw value underlying the master key does not matter.
+             * - Need the encrypted master keys stored with the instruction.
+             */
+
+            // Runtime:
+            var runtimeKey1 = encryptedKey1;
+
+            var runtimeEncryptedKey1DerivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(callerInstOffset1), BitConverter.GetBytes(currentInstOffset), currentInstOffset, HashAlgorithmName.SHA512, 32);
+            var decryptedMasterKey = AesGcmImplementation.Decrypt(runtimeKey1, runtimeEncryptedKey1DerivedKey);
+
+            var decryptedData = AesGcmImplementation.Decrypt(encryptedOperand, decryptedMasterKey);
+
+
+
+            // Or do something crazy.
+
+            //var payload = currentInstOperand.Concat(opCodeBytes).ToArray();
+
+            //using (var shamir = new ShamirSecretSharingImplementation.ShamirSecretSharing())
+            //{
+
+            //    var mod = BigInteger.Pow(2, 4253) - 1;
+            //    var val = new BigInteger(payload);
+
+
+            //    var shares = shamir.Split(2, 3, val, mod);
+
+            //    var value = shamir.Join(shares, mod);
+
+            //    var originalPayload = value.ToByteArray();
+
+            //    if (payload != originalPayload)
+            //    {
+
+            //    }
+
+            //}
+
+
+
+
+            //// This happens at compile time, and runtime. The key is derived from what the runtime knows.
+            //var derivedKeyBytes2 = Rfc2898DeriveBytes.Pbkdf2(derivedMasterKeyBytes, BitConverter.GetBytes(callerInstOffset2), currentInstOffset, HashAlgorithmName.SHA512, 32);
+            //Debugger.Break();
+
+
+            // RUNTIME NOW.
+
+            //var runtimeDerivedKeyBytes1 = Rfc2898DeriveBytes.Pbkdf2(derivedMasterKeyBytes, BitConverter.GetBytes(callerInstOffset1), currentInstOffset, HashAlgorithmName.SHA512, 32);
+
+
+
             //var ctorInfo = typeof(InstanceCreationTest).GetConstructors()[0];
             //var mdToken = ctorInfo.MetadataToken;
 

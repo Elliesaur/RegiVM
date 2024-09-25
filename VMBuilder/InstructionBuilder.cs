@@ -11,6 +11,7 @@ using AsmResolver.PE.DotNet.Cil;
 using System.Reflection.Emit;
 using Echo.Ast;
 using AsmResolver.DotNet;
+using System.Diagnostics;
 
 namespace RegiVM.VMBuilder
 {
@@ -18,7 +19,7 @@ namespace RegiVM.VMBuilder
     {
         private readonly Dictionary<int, List<VMInstruction>> _instructions = new Dictionary<int, List<VMInstruction>>();
         private readonly Dictionary<int, List<Tuple<object, ulong>>> _realInstructions = new Dictionary<int, List<Tuple<object, ulong>>>();
-        private readonly Dictionary<Tuple<int, int>, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<Tuple<int, int>, Tuple<int, int>>();
+        private Dictionary<Tuple<int, int>, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<Tuple<int, int>, Tuple<int, int>>();
         private readonly List<Tuple<int, int>> _usedInstructionIndexes = new List<Tuple<int, int>>();
 
         private readonly VMCompiler _compiler;
@@ -43,7 +44,6 @@ namespace RegiVM.VMBuilder
                 index == 0 ? 0 : _instructionOffsetMappings[new Tuple<int, int>(methodIndex, index - 1)].Item2, 
                 index == 0 ? instruction.ByteCode.Length + 8 + 4 : _instructionOffsetMappings[new Tuple<int, int>(methodIndex, index - 1)].Item2 + instruction.ByteCode.Length + 8 + 4
                 ));
-
         }
 
         public void AddDryPass(ulong code, object realInstruction, int methodIndex, int index = -1)
@@ -74,220 +74,308 @@ namespace RegiVM.VMBuilder
             _usedInstructionIndexes.Add(new Tuple<int, int>(methodIndex, instructionIndex));
         }
 
-        public byte[] ToByteArray(MethodDefinition originalStartMethod, bool performCompression)
+        public void CalculateOffsets(bool calculateEncrypted, out Dictionary<Tuple<int, int>, Tuple<int, int>> offsetMappings, int startIndex)
         {
-            using (var memStream = new MemoryStream())
-            using (var writer = new BinaryWriter(memStream))
+            int currentOffset = startIndex;
+            int currentIndex = 0;
+            offsetMappings = [];
+
+            // Is first is for the entire current VM instance.
+            bool isFirst = true;
+            foreach (var kv in _instructions)
             {
-
-                writer.Write(originalStartMethod.Signature!.ReturnsValue);
-                writer.Write(originalStartMethod.Signature!.GetTotalParameterCount());
-
-                // Only write used mapping data, that way we do not reveal a whole lot about our internal workings.
-                // Always skip where method index > 0 && index is 0.
-                //int totalCount = _usedInstructionIndexes.Where(x => !(x.Item1 > 0 && x.Item2 == 0)).Count();
-                //writer.Write(totalCount);
-                // We make sure it is unique.
-                // We then shuffle the indexes to make sure someone reading them cannot restore the original sequence (know what branches first).
-                var currentOffset = 0;
-                var diff = 0;
-                var prevOffset = 0;
-                KeyValuePair<Tuple<int, int>, Tuple<int, int>> prev = default;
-                bool recalculate = false;
-                foreach (var item in new Dictionary<Tuple<int, int>, Tuple<int, int>>(_instructionOffsetMappings))
+                foreach (var inst in kv.Value)
                 {
-                    currentOffset = item.Value.Item1;
-                    diff = item.Value.Item2 - item.Value.Item1;
-
-                    Console.WriteLine($"Current {currentOffset}, Previous {prevOffset}");
-                    if (currentOffset == 0 && prevOffset != 0 && !recalculate)
+                    var size = calculateEncrypted ? inst.EncryptedTotalSize : inst.Size;
+                    if (isFirst || inst.IsHandlerStart)
                     {
-                        // Method change.
-                        _instructionOffsetMappings[item.Key] = new Tuple<int, int>(prev.Value.Item2, prev.Value.Item2 + diff);
-                        Console.WriteLine($"-> NOW {_instructionOffsetMappings[item.Key]}");
-                        prevOffset = prev.Value.Item2 + diff;
-                        recalculate = true;
-                        prev = item;
-                        continue;
+                        size = inst.Size;
+                        inst.Offset = currentOffset;
+                        var nextOffset = inst.NextOffset;
+                        currentOffset += size;
+                        offsetMappings.Add(
+                            new Tuple<int, int>(inst.MethodIndex, currentIndex++),
+                            new Tuple<int, int>(inst.Offset, nextOffset));
+                        isFirst = false;
                     }
-                    else if (recalculate)
+                    else
                     {
-                        // Second or onwards after method change.
-                        _instructionOffsetMappings[item.Key] = new Tuple<int, int>(prevOffset, prevOffset + diff);
-                        Console.WriteLine($"--> NOW {_instructionOffsetMappings[item.Key]}");
-                        prevOffset = prevOffset + diff;
-                        prev = item;
-                        continue;
+                        inst.Offset = currentOffset;
+                        var nextOffset = calculateEncrypted ? inst.NextEncryptedOffset : inst.NextOffset;
+                        currentOffset += size;
+                        offsetMappings.Add(
+                            new Tuple<int, int>(inst.MethodIndex, currentIndex++),
+                            new Tuple<int, int>(inst.Offset, nextOffset));
                     }
-                    
-                    prevOffset = currentOffset;
-                    prev = item;
                 }
+                // Reset the current index for new method.
+                currentIndex = 0;          
+            }
+        }
 
-                //foreach (var instIndex in _usedInstructionIndexes.Shuffle())
-                //{
-                //    var mappingItem = _instructionOffsetMappings[instIndex];
-
-                //    if (instIndex.Item1 > 0 && instIndex.Item2 == 0)
-                //    {
-                //        // We do not need to include these mappings, they are never used.
-                //        // Raw offset is used in jump_call instruction.
-                //        continue;
-                //    }
-
-                //    // Method Index... TODO: Figure out how to remove this! No need for it :)
-                //    //writer.Write(instIndex.Item1);
-                    
-                //    // Instruction Index
-                //    writer.Write(instIndex.Item2);
-
-                //    writer.Write(mappingItem.Item1);
-                //    writer.Write(mappingItem.Item2);
-                //}
-
-                // Write instruction data. Must write method 0, then 1 after method 0.
-                for (int i = 0; i <= _compiler.MethodIndex; i++)
+        public void CalculateReferences()
+        {
+            foreach (var kv in _instructions)
+            {
+                for (int instIndex = 0; instIndex < kv.Value.Count; instIndex++)
                 {
-                    foreach (var instruction in _instructions[i])
+                    VMInstruction? inst = kv.Value[instIndex];
+                    var referencedIndexes = inst.References;
+                    if (referencedIndexes.Count == 0 
+                        && inst is not ReturnInstruction 
+                        && inst is not StartBlockInstruction
+                        )
                     {
-                        writer.Write(instruction.OpCode);
-                        if (instruction is JumpCallInstruction && ((JumpCallInstruction)instruction).IsInlineCall)
+                        continue;
+                    }
+                    if (inst is JumpCallInstruction)
+                    {
+                        foreach (var methodIndex in referencedIndexes)
                         {
-                            var operandBytes = instruction.ByteCode;
-
-                            // Patch offset.
-                            byte[] newOperandBytes = new byte[operandBytes.Length];
-                            using (var mStreamO = new MemoryStream(newOperandBytes))
-                            using (var mStream = new MemoryStream(operandBytes))
-                            using (var bReader = new BinaryReader(mStream))
-                            using (var bWriter = new BinaryWriter(mStreamO))
+                            if (methodIndex > _instructions.Count)
                             {
-                                // If position == 4 then overwrite with new byte.
-                                var existing = bReader.ReadBytes(1);
-                                bWriter.Write(existing);
-
-                                var methodIndex = bReader.ReadInt32();
-                                // Read the real offset.
-                                var methodIndexOffset = _instructionOffsetMappings[new Tuple<int, int>(methodIndex, 0)].Item1;
-                                bWriter.Write(methodIndexOffset);
-                                try
-                                {
-                                    while (true) 
-                                        bWriter.Write(bReader.ReadByte());
-                                }
-                                catch (Exception)
-                                {
-                                    // Ugh, yea I could handle it properly.
-                                }
-                                writer.Write(newOperandBytes.Length);
-                                writer.Write(newOperandBytes);
+                                // Likely an external reference.
+                                continue;
                             }
-                            
+                            var instForReference = _instructions[methodIndex][0];
+                            //var offsets = _instructionOffsetMappings[new Tuple<int, int>(methodIndex, 0)];
+                            //instForReference.ReferencedBy.Add(offsets.Item1);
+                            instForReference.ReferencedByInstruction.Add(inst);
+                            inst.ReferencesInstructions.Add(instForReference);
                         }
-                        else if (instruction is JumpBoolInstruction)
+                    }
+                    else if (inst is StartBlockInstruction)
+                    {
+                        var exceptionHandlers = ((StartBlockInstruction)inst).ExceptionHandlers;
+                        foreach (var eh in exceptionHandlers)
                         {
-                            var operandBytes = instruction.ByteCode;
-
-                            // Patch offset.
-                            byte[] newOperandBytes = new byte[operandBytes.Length];
-                            using (var mStreamO = new MemoryStream(newOperandBytes))
-                            using (var mStream = new MemoryStream(operandBytes))
-                            using (var bReader = new BinaryReader(mStream))
-                            using (var bWriter = new BinaryWriter(mStreamO))
+                            // Mark each handler start as a handler start which will NOT be encrypted.
+                            var filterStartIndex = eh.FilterIndexStart;
+                            var handlerStartIndex = eh.HandlerIndexStart;
+                            if (filterStartIndex > 0)
                             {
-                                var countOffsets = bReader.ReadInt32();
-                                bWriter.Write(countOffsets);
-
-                                for (int x = 0; x < countOffsets; x++)
-                                {
-                                    var index = bReader.ReadInt32();
-
-                                    // Read the real offset.
-                                    var branchTargetOffset = _instructionOffsetMappings[new Tuple<int, int>(i, index)].Item1;
-                                    bWriter.Write(branchTargetOffset);
-                                }
-                                
-                                try
-                                {
-                                    while (true)
-                                        bWriter.Write(bReader.ReadByte());
-                                }
-                                catch (Exception)
-                                {
-                                    // Ugh, yea I could handle it properly.
-                                }
-                                writer.Write(newOperandBytes.Length);
-                                writer.Write(newOperandBytes);
+                                var startInst = _instructions[inst.MethodIndex][filterStartIndex];
+                                startInst.IsHandlerStart = true;
+                            }
+                            if (handlerStartIndex > 0)
+                            {
+                                var startInst = _instructions[inst.MethodIndex][handlerStartIndex];
+                                startInst.IsHandlerStart = true;
                             }
                         }
-                        else if (instruction is StartBlockInstruction)
+                    }
+                    // If is return instruction and our current method index > 0
+                    else if (inst is ReturnInstruction && kv.Key > 0)
+                    {
+                        // Look up first instruction to find caller.
+                        var firstInstInMethod = _instructions[kv.Key][0];
+                        var methodCallerInsts = firstInstInMethod.ReferencedByInstruction.Where(x => x is JumpCallInstruction);
+
+                        // The method could be targeted by multiple jump call instructions. We must reference correctly ALL instances.
+                        foreach (var methodCallerInst in methodCallerInsts)
                         {
-                            var operandBytes = instruction.ByteCode;
+                            // Find next inst that will be returned to after method call. Add a reference to it from current return.
+                            var nextInstIndex = _instructions[methodCallerInst.MethodIndex].IndexOf(methodCallerInst) + 1;
+                            var nextInst = _instructions[methodCallerInst.MethodIndex][nextInstIndex];
+                            nextInst.ReferencedByInstruction.Add(inst);
 
-                            // Patch offset.
-                            byte[] newOperandBytes = new byte[operandBytes.Length];
-                            using (var mStreamO = new MemoryStream(newOperandBytes))
-                            using (var mStream = new MemoryStream(operandBytes))
-                            using (var bReader = new BinaryReader(mStream))
-                            using (var bWriter = new BinaryWriter(mStreamO))
+                            // Fix up current insts references, although this will be the wrong method index!
+                            inst.References.Add(nextInstIndex);
+                            // Easier to rely on the references instructions which is object rich and contains the correct offset + method index.
+                            inst.ReferencesInstructions.Add(nextInst);
+                        }
+                    }
+                    else if (inst is JumpBoolInstruction)
+                    {
+                        var realInst = (JumpBoolInstruction)inst;
+                        if (realInst.IsLeave)
+                        {
+                            if (referencedIndexes.Count > 1)
                             {
-                                // BlockType.
-                                bWriter.Write(bReader.ReadByte());
+                                // Cannot happen.
+                                Debugger.Break();
+                            }
 
-                                var countHandlers = bReader.ReadInt32();
-                                bWriter.Write(countHandlers);
+                            var reference = referencedIndexes.First();
+                            var instForReference = _instructions[inst.MethodIndex][reference];
 
-                                for (int x = 0; x < countHandlers; x++)
+                            instForReference.ReferencedByInstruction.Add(inst);
+                            inst.ReferencesInstructions.Add(instForReference);
+
+                            // Add endfinallys.
+                            var startSearchIndex = instIndex;
+                            var endSearchIndex = reference;
+                            var searchCount = endSearchIndex - startSearchIndex;
+                            var instsBetween = _instructions[inst.MethodIndex].GetRange(startSearchIndex, searchCount);
+                            var endfinallys = instsBetween.Where(x => x is EndFinallyInstruction);
+                            foreach (var endfinally in endfinallys)
+                            {
+                                if (instForReference.ReferencedByInstruction.Contains(endfinally))
                                 {
-                                    // Type of handler.
-                                    bWriter.Write(bReader.ReadByte());
-
-                                    // Handler index start
-                                    var handlerIndex = bReader.ReadInt32();
-
-                                    // Filter index start.
-                                    var filterIndex = bReader.ReadInt32();
-
-                                    // Read the real offsets.
-                                    var handlerOffset = handlerIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, handlerIndex)].Item1 : 0;
-                                    var filterOffset = filterIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, filterIndex)].Item1 : 0;
-                                    bWriter.Write(handlerOffset);
-                                    bWriter.Write(filterOffset);
-                                    // Read rest of stuff.
-                                    // Exception type mdtkn
-                                    bWriter.Write(bReader.ReadUInt32());
-                                    
-                                    // Exception handler object key.
-                                    var objKeyLength = bReader.ReadInt32();
-                                    bWriter.Write(objKeyLength);
-
-                                    bWriter.Write(bReader.ReadBytes(objKeyLength));
-                                    // Id
-                                    bWriter.Write(bReader.ReadInt32());
+                                    continue;
                                 }
-
-                                try
-                                {
-                                    while (true)
-                                        bWriter.Write(bReader.ReadByte());
-                                }
-                                catch (Exception)
-                                {
-                                    // Ugh, yea I could handle it properly.
-                                }
-                                writer.Write(newOperandBytes.Length);
-                                writer.Write(newOperandBytes);
+                                // Do NOT add a reference to the jump bool to the end finally. 
+                                // Doing so would break the fallthrough.
+                                //endfinally.ReferencedByInstruction.Add(inst);
+                                inst.ReferencesInstructions.Add(endfinally);
+                                // Tie it back so the inst target for the leave is linked to the end finally.
+                                instForReference.ReferencedByInstruction.Add(endfinally);
                             }
                         }
                         else
                         {
+                            foreach (var reference in referencedIndexes)
+                            {
+                                if (reference > _instructions[inst.MethodIndex].Count)
+                                {
+                                    // Likely an external reference.
+                                    continue;
+                                }
+                                var instForReference = _instructions[inst.MethodIndex][reference];
+
+                                // This must be done after offsets are calculated.
+                                //var offsets = _instructionOffsetMappings[new Tuple<int, int>(inst.MethodIndex, reference)];
+                                //instForReference.ReferencedBy.Add(offsets.Item1);
+                                instForReference.ReferencedByInstruction.Add(inst);
+                                inst.ReferencesInstructions.Add(instForReference);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (var reference in referencedIndexes)
+                        {
+                            if (reference > _instructions[inst.MethodIndex].Count)
+                            {
+                                // Likely an external reference.
+                                continue;
+                            }
+                            var instForReference = _instructions[inst.MethodIndex][reference];
+
+                            // This must be done after offsets are calculated.
+                            //var offsets = _instructionOffsetMappings[new Tuple<int, int>(inst.MethodIndex, reference)];
+                            //instForReference.ReferencedBy.Add(offsets.Item1);
+                            instForReference.ReferencedByInstruction.Add(inst);
+                            inst.ReferencesInstructions.Add(instForReference);
+                        }
+                    }
+                }
+            }
+        }
+
+        public byte[] ToByteArray(MethodDefinition originalStartMethod, bool performCompression)
+        {
+            var useEncryption = true;
+            using (var memStream = new MemoryStream())
+            using (var writer = new BinaryWriter(memStream))
+            {
+                writer.Write(originalStartMethod.Signature!.ReturnsValue);
+                writer.Write(originalStartMethod.Signature!.GetTotalParameterCount());
+
+                // Calculate new instruction offset mappings and update all instructions to have offsets in their sequence.
+                CalculateOffsets(false, out _instructionOffsetMappings, 0);
+
+                // Perform reference calculations.
+                CalculateReferences();
+
+                if (useEncryption)
+                {
+                    // Calculate offsets again, this time taking into consideration encryption keys.
+                    CalculateOffsets(true, out _instructionOffsetMappings, 0);
+                }
+
+                // Patch offsets and issues with particular instruction bytecodes.
+                PatchInstructionIndexesAsOffsets();
+
+                // Add encryption over current bytecode.
+                if (useEncryption)
+                {
+                    for (int i = 0; i <= _compiler.MethodIndex; i++)
+                    {
+                        VMInstruction prevInstruction = null!;
+
+                        for (int instIndex = 0; instIndex < _instructions[i].Count; instIndex++)
+                        {
+                            VMInstruction? instruction = _instructions[i][instIndex];
+                            var mapping = _instructionOffsetMappings[new Tuple<int, int>(i, instIndex)];
+                            if (instIndex == 40 || instIndex == 41)
+                            {
+
+                            }
+                            if (instruction.IsHandlerStart || (i == 0 && instIndex == 0))
+                            {
+                                // First instruction!
+                                // Is encrypted = false
+                                writer.Write(false);
+                                writer.Write(instruction.OpCode);
+
+                                var operandBytes = instruction.ByteCode;
+                                writer.Write(operandBytes.Length);
+                                writer.Write(operandBytes);
+                            }
+                            else
+                            {
+                                instruction.InitializeMasterKey();
+                                instruction.EncryptCurrentByteCodeAndOperand();
+                                instruction.AddKeys(prevInstruction);
+
+                                var pos = writer.BaseStream.Position;
+                                if (pos - 5 != mapping.Item1)
+                                {
+                                    Debugger.Break();
+                                }
+
+                                var isEncrypted = true;
+                                writer.Write(isEncrypted);
+
+                                var keyCount = instruction.EncryptionKeys.Count;
+                                writer.Write(keyCount);
+
+                                foreach (var key in instruction.EncryptionKeys)
+                                {
+                                    // Write key length (4)
+                                    writer.Write(key.Length);
+                                    // Write the key itself.
+                                    writer.Write(key);
+                                }
+
+                                // Write length of encrypted content, then encrypted content.
+                                var encryptedBytes = instruction.EncryptedByteCode;
+                                writer.Write(encryptedBytes.Length);
+                                writer.Write(encryptedBytes);
+                                var afterPos = writer.BaseStream.Position;
+                                var size = afterPos - pos;
+                                if (afterPos - 5 != mapping.Item2)
+                                {
+                                    Debugger.Break();
+                                }
+                                if (size != instruction.EncryptedTotalSize)
+                                {
+                                    Debugger.Break();
+                                }
+                            }
+                            prevInstruction = instruction;
+                        }
+                    }
+                }
+                else
+                {
+                    // Write instruction data. Must write method 0, then 1 after method 0.
+                    for (int i = 0; i <= _compiler.MethodIndex; i++)
+                    {
+                        foreach (var instruction in _instructions[i])
+                        {
+                            // Is Encrypted = false
+                            writer.Write(false);
+                            writer.Write(instruction.OpCode);
+
                             var operandBytes = instruction.ByteCode;
                             writer.Write(operandBytes.Length);
                             writer.Write(operandBytes);
                         }
                     }
                 }
-                
+
                 var result = memStream.ToArray();
                 if (performCompression)
                 {
@@ -301,6 +389,142 @@ namespace RegiVM.VMBuilder
                 else
                 {
                     return result;
+                }
+            }
+
+        }
+
+        private void PatchInstructionIndexesAsOffsets()
+        {
+            for (int i = 0; i <= _compiler.MethodIndex; i++)
+            {
+                foreach (var instruction in _instructions[i])
+                {
+                    if (instruction is JumpCallInstruction && ((JumpCallInstruction)instruction).IsInlineCall)
+                    {
+                        var operandBytes = instruction.ByteCode;
+
+                        // Patch offset.
+                        byte[] newOperandBytes = new byte[operandBytes.Length];
+                        using (var mStreamO = new MemoryStream(newOperandBytes))
+                        using (var mStream = new MemoryStream(operandBytes))
+                        using (var bReader = new BinaryReader(mStream))
+                        using (var bWriter = new BinaryWriter(mStreamO))
+                        {
+                            // If position == 4 then overwrite with new byte.
+                            var existing = bReader.ReadBytes(1);
+                            bWriter.Write(existing);
+
+                            var methodIndex = bReader.ReadInt32();
+                            // Read the real offset.
+                            var methodIndexOffset = _instructionOffsetMappings[new Tuple<int, int>(methodIndex, 0)].Item1;
+                            bWriter.Write(methodIndexOffset);
+                            try
+                            {
+                                while (true)
+                                    bWriter.Write(bReader.ReadByte());
+                            }
+                            catch (Exception)
+                            {
+                                // Ugh, yea I could handle it properly.
+                            }
+                            instruction.ByteCode = newOperandBytes;
+                        }
+
+                    }
+                    else if (instruction is JumpBoolInstruction)
+                    {
+                        var operandBytes = instruction.ByteCode;
+
+                        // Patch offset.
+                        byte[] newOperandBytes = new byte[operandBytes.Length];
+                        using (var mStreamO = new MemoryStream(newOperandBytes))
+                        using (var mStream = new MemoryStream(operandBytes))
+                        using (var bReader = new BinaryReader(mStream))
+                        using (var bWriter = new BinaryWriter(mStreamO))
+                        {
+                            var countOffsets = bReader.ReadInt32();
+                            bWriter.Write(countOffsets);
+
+                            for (int x = 0; x < countOffsets; x++)
+                            {
+                                var index = bReader.ReadInt32();
+
+                                // Read the real offset.
+                                var branchTargetOffset = _instructionOffsetMappings[new Tuple<int, int>(i, index)].Item1;
+                                bWriter.Write(branchTargetOffset);
+                            }
+
+                            try
+                            {
+                                while (true)
+                                    bWriter.Write(bReader.ReadByte());
+                            }
+                            catch (Exception)
+                            {
+                                // Ugh, yea I could handle it properly.
+                            }
+                            instruction.ByteCode = newOperandBytes;
+                        }
+                    }
+                    else if (instruction is StartBlockInstruction)
+                    {
+                        var operandBytes = instruction.ByteCode;
+
+                        // Patch offset.
+                        byte[] newOperandBytes = new byte[operandBytes.Length];
+                        using (var mStreamO = new MemoryStream(newOperandBytes))
+                        using (var mStream = new MemoryStream(operandBytes))
+                        using (var bReader = new BinaryReader(mStream))
+                        using (var bWriter = new BinaryWriter(mStreamO))
+                        {
+                            // BlockType.
+                            bWriter.Write(bReader.ReadByte());
+
+                            var countHandlers = bReader.ReadInt32();
+                            bWriter.Write(countHandlers);
+
+                            for (int x = 0; x < countHandlers; x++)
+                            {
+                                // Type of handler.
+                                bWriter.Write(bReader.ReadByte());
+
+                                // Handler index start
+                                var handlerIndex = bReader.ReadInt32();
+
+                                // Filter index start.
+                                var filterIndex = bReader.ReadInt32();
+
+                                // Read the real offsets.
+                                var handlerOffset = handlerIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, handlerIndex)].Item1 : 0;
+                                var filterOffset = filterIndex > 0 ? _instructionOffsetMappings[new Tuple<int, int>(i, filterIndex)].Item1 : 0;
+                                bWriter.Write(handlerOffset);
+                                bWriter.Write(filterOffset);
+                                // Read rest of stuff.
+                                // Exception type mdtkn
+                                bWriter.Write(bReader.ReadUInt32());
+
+                                // Exception handler object key.
+                                var objKeyLength = bReader.ReadInt32();
+                                bWriter.Write(objKeyLength);
+
+                                bWriter.Write(bReader.ReadBytes(objKeyLength));
+                                // Id
+                                bWriter.Write(bReader.ReadInt32());
+                            }
+
+                            try
+                            {
+                                while (true)
+                                    bWriter.Write(bReader.ReadByte());
+                            }
+                            catch (Exception)
+                            {
+                                // Ugh, yea I could handle it properly.
+                            }
+                            instruction.ByteCode = newOperandBytes;
+                        }
+                    }
                 }
             }
         }

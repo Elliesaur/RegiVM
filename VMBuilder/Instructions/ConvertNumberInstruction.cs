@@ -11,10 +11,11 @@ namespace RegiVM.VMBuilder.Instructions
         public VMRegister FromReg1 { get; }
         public bool ThrowOverflowException { get; }
         public bool IsUnsigned { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public ConvertNumberInstruction(VMCompiler compiler, CilInstruction inst)
         {
+            MethodIndex = compiler.MethodIndex;
             Inst = inst;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ConvertNumber;

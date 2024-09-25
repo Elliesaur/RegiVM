@@ -29,10 +29,11 @@ namespace RegiVM.VMBuilder.Instructions
         public VMRegister Reg2 { get; }
         public VMRegister ToPushReg { get; }
         public ComparatorType CompType { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public ComparatorInstruction(VMCompiler compiler, CilInstruction inst, ComparatorType compType)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             CompType = compType;
 

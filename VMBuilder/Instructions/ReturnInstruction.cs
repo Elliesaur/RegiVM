@@ -7,10 +7,11 @@ namespace RegiVM.VMBuilder.Instructions
         public override ulong OpCode { get; }
         public VMRegister TempReg1 { get; }
         public bool HasReturnValue { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public ReturnInstruction(VMCompiler compiler, bool hasReturnValue)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.Ret;
             HasReturnValue = hasReturnValue;

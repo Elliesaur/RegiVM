@@ -57,7 +57,7 @@ namespace RegiVM.VMBuilder.Instructions
         private readonly VMCompiler compiler;
 
         public override ulong OpCode { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
         public VMBlockType BlockType { get; }
         public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
 
@@ -65,6 +65,7 @@ namespace RegiVM.VMBuilder.Instructions
 
         public StartBlockInstruction(VMCompiler compiler, IList<HandlerClause<CilInstruction>> handlers, VMBlockType blockType)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.StartRegionBlock;
             this.compiler = compiler;

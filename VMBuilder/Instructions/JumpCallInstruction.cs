@@ -15,18 +15,21 @@ namespace RegiVM.VMBuilder.Instructions
         public override ulong OpCode { get; }
         public List<VMRegister> ArgRegs { get; }
         public VMRegister ReturnReg1 { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
         public int MethodIndexToCall { get; }
         public bool IsInlineCall { get; }
 
         public JumpCallInstruction(VMCompiler compiler, CilInstruction inst, IMethodDefOrRef target, int methodIndexToCall, bool isInlineCall)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             ArgRegs = new List<VMRegister>();
             OpCode = compiler.OpCodes.JumpCall;
             MethodIndexToCall = methodIndexToCall;
             IsInlineCall = isInlineCall;
 
+            // Add reference to the method index.
+            AddReference(MethodIndexToCall);
             
             var paramCount = target.Signature!.GetTotalParameterCount();
             if (inst.OpCode.Code == CilCode.Newobj)

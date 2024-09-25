@@ -12,10 +12,11 @@ namespace RegiVM.VMBuilder.Instructions
         public CilLocalVariable LocalVar { get; }
         public VMRegister Reg1 { get; }
         public VMRegister TempReg1 { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public LocalStoreInstruction(VMCompiler compiler, CilInstruction inst, CilLocalVariable localVar)
         {
+            MethodIndex = compiler.MethodIndex;
             Inst = inst;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.LoadOrStoreRegister;

@@ -3,6 +3,7 @@ using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime.Handlers;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Security.Cryptography;
 
 namespace RegiVM.VMRuntime
 {
@@ -29,10 +30,9 @@ namespace RegiVM.VMRuntime
 
         public StackList<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new StackList<VMRuntimeExceptionHandler>();
 
-        // Track instruction offset mappings for branch statements.
-        // Item1 = start offset (IP).
-        // Item2 = end offset (IP end after tracking).
-        //public Dictionary<int, Tuple<int, int>> InstructionOffsetMappings { get; } = new Dictionary<int, Tuple<int, int>>();
+        public int CurrentIPStart { get; set; }
+        public Stack<int> IP { get; set; } = new Stack<int>();
+        public int UnstableNextIP { get; set; }
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -65,25 +65,6 @@ namespace RegiVM.VMRuntime
                     ParamCount = numParams
                 });
 
-                //var mappingLength = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //track += 4;
-                //for (var i = 0; i < mappingLength; i++)
-                //{
-                //    // TODO: Remove this, how!?
-                //    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    //track += 4;
-
-                //    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
-                //}
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
             else
@@ -103,24 +84,6 @@ namespace RegiVM.VMRuntime
                     ParamCount = numParams
                 });
 
-                //var mappingLength = BitConverter.ToInt32(data.Take(4).ToArray());
-                //var track = 4;
-                //for (var i = 0; i < mappingLength; i++) 
-                //{
-                //    //var methodIndex = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    //track += 4;
-
-                //    var mapKey = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    var offset1 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    var offset2 = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
-                //    track += 4;
-
-                //    InstructionOffsetMappings.Add(mapKey, new Tuple<int, int>(offset1, offset2));
-                //}
                 Heap.Add(DATA, data.Skip(track).ToArray());
             }
             for (int i = 0; i < parameters.Length; i++)
@@ -131,14 +94,87 @@ namespace RegiVM.VMRuntime
 
         internal void Step(ref int ip)
         {
-            // Step once
-            ulong opCode = BitConverter.ToUInt64(Heap[DATA].Skip(ip).Take(8).ToArray());
-            ip += 8;
+            byte[] data = Heap[DATA];
 
-            int operandLength = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
-            ip += 4;
+            ulong opCode = 0;
+            int operandLength = 0;
+            byte[] operandValue = new byte[0];
+            
+            bool isEncrypted = Heap[DATA].Skip(ip).Take(1).ToArray()[0] == 1 ? true : false;
+            ip += 1;
 
-            byte[] operandValue = Heap[DATA].Skip(ip).Take(operandLength).ToArray();
+            if (isEncrypted)
+            {
+                var copyStack = new Stack<int>(IP.Reverse());
+                var current = copyStack.Pop();
+                var prev = copyStack.Pop();
+
+                // IsEncrypted | Number of keys (4) | key1 size | key1 | key2 size | key 2 ... n
+                // | encrypted data LENGTH (4) | encrypted data (opcode + operand length + tag max size + nonce max size)
+
+                var numKeys = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                ip += 4;
+
+                byte[] encryptedKey = new byte[32];
+                byte[] decryptedKey = new byte[0];
+                for (int i = 0; i < numKeys; i++)
+                {
+                    try
+                    {
+                        var keySize = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                        ip += 4;
+
+                        // Read encrypted key
+                        encryptedKey = Heap[DATA].Skip(ip).Take(keySize).ToArray();
+                        ip += keySize;
+
+                        // Derive key
+                        var derivedEncryptedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(prev), BitConverter.GetBytes(current), 10000 + current, HashAlgorithmName.SHA512, 32);
+
+                        // Decrypt key using current offset + previous offset.
+                        decryptedKey = AesGcmImplementation.Decrypt(encryptedKey, derivedEncryptedKey);
+                    }
+                    catch (Exception)
+                    {
+                        // We must read ALL keys.
+                        continue;
+                    }
+                }
+
+                var dataLength = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                ip += 4;
+
+                data = AesGcmImplementation.Decrypt(Heap[DATA].Skip(ip).Take(dataLength).ToArray(), decryptedKey);
+                // IP is now actually at the next instruction.
+                ip += dataLength;
+
+                // Technically may not be next IP but a good indicator.
+                UnstableNextIP = ip;
+
+                var encIP = 0;
+                // Step once
+                opCode = BitConverter.ToUInt64(data.Skip(encIP).Take(8).ToArray());
+                encIP += 8;
+
+                operandLength = BitConverter.ToInt32(data.Skip(encIP).Take(4).ToArray());
+                encIP += 4;
+
+                operandValue = data.Skip(encIP).Take(operandLength).ToArray();
+            }
+            else
+            {
+                // Step once
+                opCode = BitConverter.ToUInt64(data.Skip(ip).Take(8).ToArray());
+                ip += 8;
+
+                operandLength = BitConverter.ToInt32(data.Skip(ip).Take(4).ToArray());
+                ip += 4;
+
+                operandValue = data.Skip(ip).Take(operandLength).ToArray();
+
+                // Technically may not be next IP but a good indicator.
+                UnstableNextIP = ip + operandLength;
+            }
 
             try
             {
@@ -149,7 +185,13 @@ namespace RegiVM.VMRuntime
                 {
                     ip = track;
                 }
-                else
+                else if (isEncrypted && IP.Count < 2)
+                {
+                    // If it is encrypted but the first instruction, set it to += track due to it being unencrypted.
+                    // This is entirely redundant when the instruction is encrypted due to the carved area.
+                    ip += track;
+                }
+                else if (!isEncrypted)
                 {
                     ip += track;
                 }
@@ -222,12 +264,16 @@ namespace RegiVM.VMRuntime
 
             while (ip < Heap[DATA].Length)
             {
+                CurrentIPStart = ip;
+                IP.Push(CurrentIPStart);
                 Step(ref ip);
+
                 if (ip == int.MinValue)
                 {
                     // We have returned a value, or are wanting to return.
                     break;
                 }
+
                 Heap[INSTRUCTION_POINTER] = BitConverter.GetBytes(ip);
             }
             sw.Stop();

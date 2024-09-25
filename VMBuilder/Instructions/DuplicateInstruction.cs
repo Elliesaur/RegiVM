@@ -9,10 +9,11 @@ namespace RegiVM.VMBuilder.Instructions
         public CilInstruction Inst { get; }
         public VMRegister ToReg1 { get; }
         public VMRegister FromReg1 { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public DuplicateInstruction(VMCompiler compiler, CilInstruction inst)
         {
+            MethodIndex = compiler.MethodIndex;
             Inst = inst;
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.Duplicate;

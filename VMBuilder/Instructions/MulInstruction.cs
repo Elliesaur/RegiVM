@@ -11,10 +11,11 @@ namespace RegiVM.VMBuilder.Instructions
         public VMRegister Reg1 { get; }
         public VMRegister Reg2 { get; }
         public VMRegister ToPushReg { get; }
-        public override byte[] ByteCode { get; }
+        public override byte[] ByteCode { get; set; }
 
         public MulInstruction(VMCompiler compiler, CilInstruction inst)
         {
+            MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
             // Get last two registers.
             var rawReg2 = Registers.Temporary.Pop();

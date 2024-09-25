@@ -348,7 +348,7 @@ namespace RegiVM.VMRuntime.Handlers
             {
                 t.MethodSignatures.Push(new VMMethodSig()
                 {
-                    PreviousIP = BitConverter.ToInt32(h[t.INSTRUCTION_POINTER]) + tracker + 12 /* 12 is for 8 + 4 opcode + operand length */,
+                    PreviousIP = t.UnstableNextIP,
                     ParamCount = numParams,
                     ParamValues = parameters,
                     HasReturnValue = hasReturnValue,
