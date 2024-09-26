@@ -44,6 +44,9 @@ namespace RegiVM.VMBuilder
         public int Push { get; set; }
         public int MethodIndex { get; set; } = 0;
 
+        public bool EncryptInstructions { get; private set; } = false;
+        public bool CompressInstructions { get; private set; } = true;
+
         public ScopeBlock<CilInstruction> MethodBlocks { get; private set; }
         public ControlFlowGraph<CilInstruction> MethodStaticFlowGraph { get; private set; }
         public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
@@ -59,6 +62,18 @@ namespace RegiVM.VMBuilder
         public VMCompiler RandomizeOpCodes()
         {
             OpCodes.RandomizeAll();
+            return this;
+        }
+
+        public VMCompiler Encrypt(bool encrypt = true)
+        {
+            EncryptInstructions = encrypt;
+            return this;
+        }
+
+        public VMCompiler Compress(bool compress = true)
+        {
+            CompressInstructions = compress;
             return this;
         }
 
@@ -86,7 +101,11 @@ namespace RegiVM.VMBuilder
         /// <param name="exceptionHandlers"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public byte[] Compile(IList<CilInstruction> instructionsToCompile, IList<CilExceptionHandler> exceptionHandlers, CilMethodBody parentBody)
+        public byte[] Compile(
+            IList<CilInstruction> instructionsToCompile, 
+            IList<CilExceptionHandler> exceptionHandlers, 
+            CilMethodBody parentBody, 
+            MethodDefinition? methodToCheckForInlineTargets = null)
         {
             var parentMethodDefinition = parentBody?.Owner;
             if (parentMethodDefinition == null)
@@ -96,16 +115,15 @@ namespace RegiVM.VMBuilder
 
             exceptionHandlers = instructionsToCompile.FindRelatedExceptionHandlers(exceptionHandlers);
 
-
             // Must add the current parent owner method to ensure no duplicate methods are permitted entry.
-            ViableInlineTargets.Add(parentMethodDefinition);
+            ViableInlineTargets.Add(methodToCheckForInlineTargets ?? parentMethodDefinition);
 
             var methodCalls = instructionsToCompile.FindAllCalls();
             foreach (var methodCall in methodCalls.Where(x => x is MethodDefinition))
             {
                 var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
                 // We must use the parent method definition again to check that it is called by us ONLY.
-                if (allCallsToMethod.All(x => x == parentMethodDefinition) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
+                if (allCallsToMethod.All(x => x == (methodToCheckForInlineTargets ?? parentMethodDefinition)) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
                 {
                     // Only called by itself, no other method calls this method.
                     ViableInlineTargets.Add((MethodDefinition)methodCall);
@@ -198,7 +216,7 @@ namespace RegiVM.VMBuilder
             }
 
             // TODO: Replace this signature with custom signature for the instructions interacted with.
-            return InstructionBuilder.ToByteArray(parentMethodDefinition.Signature!, true);
+            return InstructionBuilder.ToByteArray(parentMethodDefinition.Signature!, CompressInstructions, EncryptInstructions);
         }
 
         public byte[] Compile(MethodDefinition startMethod)
@@ -208,70 +226,7 @@ namespace RegiVM.VMBuilder
             var byteCode = Compile(body.Instructions, body.ExceptionHandlers, body);
             body.Instructions.OptimizeMacros();
             return byteCode;
-            //// Add itself.
-            //ViableInlineTargets.Add(startMethod);
-
-            //// TODO: Sort out concurrency issues.
-            //// Pass as param for AST visitor?
-            //var methodCalls = startMethod.CilMethodBody!.FindAllCalls();
-            //foreach (var methodCall in methodCalls.Where(x => x is MethodDefinition))
-            //{
-            //    var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
-
-            //    if (allCallsToMethod.All(x => x == startMethod) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
-            //    {
-            //        // Only called by itself, no other method calls this method.
-            //        ViableInlineTargets.Add((MethodDefinition)methodCall);
-            //    }
-            //}
-            
-            //foreach (var processMethod in ViableInlineTargets)
-            //{
-            //    CurrentMethod = (MethodDefinition)processMethod;
-            //    CurrentSignature = processMethod.Signature!;
-            //    CurrentMethodBody.Instructions.ExpandMacros();
-
-            //    CurrentInstructions = CurrentMethodBody.Instructions.ToList();
-            //    var sfg = CurrentMethod.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
-
-            //    MethodBlocks = BlockBuilder.ConstructBlocks(sfg);
-            //    MethodStaticFlowGraph = sfg;
-            //    MethodDataFlowGraph = dfg;
-
-            //    var astCompUnit = sfg.ToCompilationUnit(new CilPurityClassifier());
-
-            //    CurrentMethod.CilMethodBody!.Instructions.ExpandMacros();
-
-            //    // Dry pass without exception handlers.
-            //    var dryPass = new VMNodeVisitorDryPass(DryPass.Regular);
-            //    dryPass.Visit(astCompUnit, this);
-
-            //    ExceptionHandlers.AddRange(CompileExceptionHandlers(CurrentMethod.CilMethodBody!.ExceptionHandlers.ToList(), MethodIndex));
-
-            //    // Dry pass with exception handlers.
-            //    dryPass = new VMNodeVisitorDryPass(DryPass.ExceptionHandlers);
-            //    dryPass.Visit(astCompUnit, this);
-
-
-            //    var visitor = new VMNodeVisitor();
-            //    visitor.Visit(astCompUnit, this);
-
-            //    //var walker = new VMAstWalker() { Compiler = this };
-            //    //AstNodeWalker<CilInstruction>.Walk(walker, astCompUnit);
-
-            //    CurrentMethod.CilMethodBody!.Instructions.OptimizeMacros();
-                
-            //    if (CurrentMethod != ViableInlineTargets.Last())
-            //    {
-            //        // Increment the method index.
-            //        MethodIndex++;
-            //        InstructionBuilder.AddMethodDoNotIncrementMethodIndex();
-            //    }
-            //}
-
-            //return InstructionBuilder.ToByteArray(startMethod.Signature!, true);
         }
-
 
         public List<VMExceptionHandler> CompileExceptionHandlers(List<CilExceptionHandler> handlers, int methodIndex)
         {
@@ -339,5 +294,9 @@ namespace RegiVM.VMBuilder
             return results;
         }
 
+        public ulong[] GetUsedOpCodes()
+        {
+            return InstructionBuilder.GetUsedOpCodes();
+        }
     }
 }

@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 using Echo.ControlFlow.Regions.Detection;
 using Echo.ControlFlow.Blocks;
 using Echo.ControlFlow.Serialization.Blocks;
+using AsmResolver.DotNet.Signatures;
+using AsmResolver.DotNet.Collections;
 
 namespace RegiVM.VMBuilder
 {
@@ -197,20 +199,16 @@ namespace RegiVM.VMBuilder
             var res = new List<CilExceptionHandler>();
             foreach (var eh in exceptionHandlers)
             {
-                var handlerOffset = eh.HandlerStart?.Offset ?? -1;
-                var filterOffset = eh.FilterStart?.Offset ?? -1;
-                var tryStart = eh.TryStart?.Offset ?? -1;
-
                 // If the handler, filter, or try start itself is within the instruction range then the exception handler is relevant.
-                if (instructions.Any(x => x.Offset == handlerOffset))
+                if (instructions.Any(x => x == eh.HandlerStart))
                 {
                     res.Add(eh);
                 }
-                else if (instructions.Any(x => x.Offset == filterOffset))
+                else if (instructions.Any(x => x == eh.FilterStart))
                 {
                     res.Add(eh);
                 }
-                else if (instructions.Any(x => x.Offset == tryStart))
+                else if (instructions.Any(x => x == eh.TryStart))
                 {
                     res.Add(eh);
                 }
@@ -224,6 +222,45 @@ namespace RegiVM.VMBuilder
             var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
             var blocks = BlockBuilder.ConstructBlocks(sfg);
             return (blocks, sfg, dfg);
+        }
+
+        public static MethodSignature GetMethodSignatureForBlock(this BasicBlock<CilInstruction> block, MethodDefinition parentMethod, bool treatLocalsAsParams)
+        {
+            var body = parentMethod.CilMethodBody!;
+
+            CallingConventionAttributes attrs = CallingConventionAttributes.Default;
+            TypeSignature typeSig = parentMethod.Module!.CorLibTypeFactory.Void;
+            Dictionary<int, TypeSignature> paramSigs = new Dictionary<int, TypeSignature>();
+
+            foreach (var inst in block.Instructions)
+            {
+                if (inst.IsStarg() || inst.IsLdarg())
+                {
+                    var parameter = (Parameter)inst.Operand!;
+                    if (!paramSigs.ContainsKey(parameter.Index))
+                    {
+                        paramSigs.Add(parameter.Index, parameter.ParameterType);
+                    }
+                }
+                if (treatLocalsAsParams && (inst.IsLdloc() || inst.IsStloc()))
+                {
+                    var localVar = (CilLocalVariable)inst.Operand!;
+                    if (!paramSigs.ContainsKey(localVar.Index))
+                    {
+                        paramSigs.Add(localVar.Index, localVar.VariableType);
+                    }
+                }
+                if (inst.OpCode.Code == CilCode.Ret)
+                {
+                    // If there is a ret involved,
+                    // it will mean the method signature return type must be the signature of the parent method.
+                    typeSig = parentMethod.Signature!.ReturnType;
+                }
+            }
+
+            List<TypeSignature> paramTypeSigs = paramSigs.Select(x => x.Value).ToList();
+
+            return new MethodSignature(attrs, typeSig, paramTypeSigs);
         }
     }
 }

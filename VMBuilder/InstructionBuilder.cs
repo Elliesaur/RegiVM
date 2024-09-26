@@ -264,9 +264,8 @@ namespace RegiVM.VMBuilder
             }
         }
 
-        public byte[] ToByteArray(MethodSignature signature, bool performCompression)
+        public byte[] ToByteArray(MethodSignature signature, bool performCompression, bool useEncryption)
         {
-            var useEncryption = true;
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
@@ -582,6 +581,11 @@ namespace RegiVM.VMBuilder
         public int FindIndexForObject(object statement, int methodIndex)
         {
             return _realInstructions[methodIndex].IndexOf(_realInstructions[methodIndex].First(x => x.Item1 == statement));
+        }
+
+        public ulong[] GetUsedOpCodes()
+        {
+            return _realInstructions.SelectMany(x => x.Value.Select(x => x.Item2)).Distinct().ToArray();
         }
     }
 }
