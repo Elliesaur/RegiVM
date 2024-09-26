@@ -178,7 +178,6 @@ namespace RegiVM.VMBuilder
                 CurrentExceptionHandlers = CurrentMethodBody.ExceptionHandlers;
                 CurrentInstructions = CurrentMethodBody.Instructions.ToList();
 
-
                 var innerSfg = CurrentMethodBody.ConstructSymbolicFlowGraph(out var innerDfg);
 
                 MethodBlocks = BlockBuilder.ConstructBlocks(innerSfg);

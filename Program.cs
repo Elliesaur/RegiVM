@@ -34,7 +34,7 @@ namespace RegiVM
             var targetBlock = blocks.First();
             
             var compiler = new VMCompiler()
-                //.RandomizeOpCodes()
+                .RandomizeOpCodes()
                 .Encrypt(true)
                 .Compress(true)
                 .RegisterLimit(30);
@@ -140,6 +140,7 @@ namespace RegiVM
             Console.WriteLine(actualResult);
 
             vm.Run();
+
             try
             {
                 var reg = vm.GetReturnRegister();
