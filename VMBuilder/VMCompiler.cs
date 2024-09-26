@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace RegiVM.VMBuilder
 {
@@ -217,6 +218,32 @@ namespace RegiVM.VMBuilder
 
             // TODO: Replace this signature with custom signature for the instructions interacted with.
             return InstructionBuilder.ToByteArray(parentMethodDefinition.Signature!, CompressInstructions, EncryptInstructions);
+        }
+
+        public byte[] Compile(BasicBlock<CilInstruction> block, MethodDefinition parentMethod)
+        {
+            var sigForBlock = block.GetMethodSignatureForBlock(parentMethod, false);
+
+            var insts = block.Instructions;
+            if (insts.Last().OpCode.Code != CilCode.Ret)
+            {
+                var retInst = new CilInstruction(CilOpCodes.Ret);
+                insts.Add(retInst);
+            }
+
+            // Fake a new method.
+            var newMethodDef = new MethodDefinition(Guid.NewGuid().ToString(),
+                parentMethod.Attributes,
+                sigForBlock);
+            var newMethodBody = new CilMethodBody(newMethodDef);
+            foreach (var lv in parentMethod.CilMethodBody!.LocalVariables)
+            {
+                newMethodBody.LocalVariables.Add(new CilLocalVariable(lv.VariableType));
+            }
+            newMethodBody.Instructions.AddRange(insts);
+            newMethodBody.Instructions.CalculateOffsets();
+
+            return Compile(newMethodBody.Instructions, parentMethod.CilMethodBody!.ExceptionHandlers, newMethodBody, parentMethod);
         }
 
         public byte[] Compile(MethodDefinition startMethod)

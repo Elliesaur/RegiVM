@@ -585,7 +585,7 @@ namespace RegiVM.VMBuilder
 
         public ulong[] GetUsedOpCodes()
         {
-            return _realInstructions.SelectMany(x => x.Value.Select(x => x.Item2)).Distinct().ToArray();
+            return _instructions.SelectMany(x => x.Value.Select(x => x.OpCode)).Distinct().ToArray();
         }
     }
 }
