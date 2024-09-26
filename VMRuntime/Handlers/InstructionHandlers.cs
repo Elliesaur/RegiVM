@@ -40,7 +40,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Endfinally(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int EndFinally(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                        Dictionary<int, object> _)
         {
             // TODO: stacked/nested finally clauses...?
@@ -397,7 +397,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int DuplicateRegister(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int Duplicate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                                 Dictionary<int, object> _)
         {
             // This covers loading and storing.
@@ -590,7 +590,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Return(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int Ret(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                    Dictionary<int, object> _)
         {
             // RETURN 
