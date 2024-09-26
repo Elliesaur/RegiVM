@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver.DotNet.Dynamic\AsmResolver.DotNet.Dynamic.csproj" />
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver.DotNet\AsmResolver.DotNet.csproj" />
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver.PE.File\AsmResolver.PE.File.csproj" />
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver.PE\AsmResolver.PE.csproj" />
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver.Symbols.Pdb\AsmResolver.Symbols.Pdb.csproj" />
+    <ProjectReference Include="..\AsmResolver\src\AsmResolver\AsmResolver.csproj" />
+    <ProjectReference Include="..\Echo\src\Core\Echo.Ast\Echo.Ast.csproj" />
+    <ProjectReference Include="..\Echo\src\Core\Echo.ControlFlow\Echo.ControlFlow.csproj" />
+    <ProjectReference Include="..\Echo\src\Core\Echo.DataFlow\Echo.DataFlow.csproj" />
+    <ProjectReference Include="..\Echo\src\Core\Echo\Echo.csproj" />
+    <ProjectReference Include="..\Echo\src\Platforms\Echo.Platforms.AsmResolver\Echo.Platforms.AsmResolver.csproj" />
+  </ItemGroup>
+
+</Project>
