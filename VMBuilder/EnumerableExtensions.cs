@@ -1,12 +1,20 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using Echo.ControlFlow;
+using Echo.DataFlow.Construction;
+using Echo.DataFlow;
+using Echo.Platforms.AsmResolver;
+using Echo.ControlFlow.Construction;
 using RegiVM.VMBuilder.Instructions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Echo.ControlFlow.Regions.Detection;
+using Echo.ControlFlow.Blocks;
+using Echo.ControlFlow.Serialization.Blocks;
 
 namespace RegiVM.VMBuilder
 {
@@ -114,8 +122,18 @@ namespace RegiVM.VMBuilder
         
         public static IList<IMethodDefOrRef> FindAllCalls(this CilMethodBody md)
         {
+            return md.Instructions.FindAllCalls();
+        }
+
+        public static IList<IMethodDefOrRef> FindAllCalls(this CilInstructionCollection instructions)
+        {
+            return instructions.ToList().FindAllCalls();
+        }
+
+        public static IList<IMethodDefOrRef> FindAllCalls(this IList<CilInstruction> instructions)
+        {
             var res = new List<IMethodDefOrRef>();
-            foreach (var inst in md.Instructions)
+            foreach (var inst in instructions)
             {
                 if (inst.OpCode.FlowControl != CilFlowControl.Call)
                 {
@@ -146,6 +164,66 @@ namespace RegiVM.VMBuilder
                 }
             }
             return res;
+        }
+
+        public static ControlFlowGraph<CilInstruction> ConstructSymbolicFlowGraph(
+            this IList<CilInstruction> instructions, 
+            IList<CilExceptionHandler> exceptionHandlers,
+            CilMethodBody methodBody,
+            out DataFlowGraph<CilInstruction> dataFlowGraph)
+        {
+            var architecture = new CilArchitecture(methodBody);
+            var dfgBuilder = new CilStateTransitioner(architecture);
+            var cfgBuilder = new SymbolicFlowGraphBuilder<CilInstruction>(
+                architecture,
+                instructions,
+                dfgBuilder
+            );
+
+            var ehRanges = exceptionHandlers
+                .ToEchoRanges()
+                .ToArray();
+
+            var cfg = cfgBuilder.ConstructFlowGraph(0, ehRanges);
+            if (ehRanges.Length > 0)
+                cfg.DetectExceptionHandlerRegions(ehRanges);
+
+            dataFlowGraph = dfgBuilder.DataFlowGraph;
+            return cfg;
+        }
+
+        public static IList<CilExceptionHandler> FindRelatedExceptionHandlers(this IList<CilInstruction> instructions, IList<CilExceptionHandler> exceptionHandlers)
+        {
+            var res = new List<CilExceptionHandler>();
+            foreach (var eh in exceptionHandlers)
+            {
+                var handlerOffset = eh.HandlerStart?.Offset ?? -1;
+                var filterOffset = eh.FilterStart?.Offset ?? -1;
+                var tryStart = eh.TryStart?.Offset ?? -1;
+
+                // If the handler, filter, or try start itself is within the instruction range then the exception handler is relevant.
+                if (instructions.Any(x => x.Offset == handlerOffset))
+                {
+                    res.Add(eh);
+                }
+                else if (instructions.Any(x => x.Offset == filterOffset))
+                {
+                    res.Add(eh);
+                }
+                else if (instructions.Any(x => x.Offset == tryStart))
+                {
+                    res.Add(eh);
+                }
+            }
+            return res;
+        }
+
+        public static (ScopeBlock<CilInstruction>, ControlFlowGraph<CilInstruction>, DataFlowGraph<CilInstruction>)
+            GetGraphsAndBlocks(this MethodDefinition method)
+        {
+            var sfg = method.CilMethodBody!.ConstructSymbolicFlowGraph(out var dfg);
+            var blocks = BlockBuilder.ConstructBlocks(sfg);
+            return (blocks, sfg, dfg);
         }
     }
 }

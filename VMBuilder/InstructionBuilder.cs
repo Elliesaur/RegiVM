@@ -12,6 +12,7 @@ using System.Reflection.Emit;
 using Echo.Ast;
 using AsmResolver.DotNet;
 using System.Diagnostics;
+using AsmResolver.DotNet.Signatures;
 
 namespace RegiVM.VMBuilder
 {
@@ -263,14 +264,16 @@ namespace RegiVM.VMBuilder
             }
         }
 
-        public byte[] ToByteArray(MethodDefinition originalStartMethod, bool performCompression)
+        public byte[] ToByteArray(MethodSignature signature, bool performCompression)
         {
             var useEncryption = true;
             using (var memStream = new MemoryStream())
             using (var writer = new BinaryWriter(memStream))
             {
-                writer.Write(originalStartMethod.Signature!.ReturnsValue);
-                writer.Write(originalStartMethod.Signature!.GetTotalParameterCount());
+                // TODO: Remove requirement for original start method.
+                // Replace this with dynamic options to add a signature instead.
+                writer.Write(signature.ReturnsValue);
+                writer.Write(signature.GetTotalParameterCount());
 
                 // Calculate new instruction offset mappings and update all instructions to have offsets in their sequence.
                 CalculateOffsets(false, out _instructionOffsetMappings, 0);

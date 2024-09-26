@@ -419,7 +419,7 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
-                        var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
+                        var retInst = new ReturnInstruction(state, state.CurrentSignature.ReturnsValue);
                         state.InstructionBuilder.Add(retInst, inst, state.MethodIndex);
                         // Lol, actually return something?
                         return retInst.TempReg1;
@@ -445,11 +445,11 @@ namespace RegiVM.VMBuilder
                         // Add offset for it.
                         var cilLabel = (CilInstructionLabel)inst.Operand!;
                         var instTarget = cilLabel.Instruction!;
-                        var indexOfInstruction = state.CurrentMethod.CilMethodBody!.Instructions.IndexOf(instTarget);
+                        var indexOfInstruction = state.CurrentInstructions.IndexOf(instTarget);
                         var tries = 0;
                         while (!state.InstructionBuilder.IsValidOpCode(instTarget.OpCode.Code) && tries++ < 5)
                         {
-                            instTarget = state.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                            instTarget = state.CurrentInstructions[++indexOfInstruction];
                         }
                         if (tries >= 5)
                         {
@@ -505,8 +505,8 @@ namespace RegiVM.VMBuilder
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
                         {
-                            var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
-                            var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
+                            var handlersForThis = state.CurrentExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
+                            var isInSame = state.CurrentExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
                             if (!isInSame)
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
@@ -535,11 +535,11 @@ namespace RegiVM.VMBuilder
                         {
                             // Add each offset position.
                             var instTarget = sw.Instruction!;
-                            var indexOfInstruction = state.CurrentMethod.CilMethodBody!.Instructions.IndexOf(instTarget);
+                            var indexOfInstruction = state.CurrentInstructions.IndexOf(instTarget);
                             var tries = 0;
                             while (!state.InstructionBuilder.IsValidOpCode(instTarget.OpCode.Code) && tries++ < 5)
                             {
-                                instTarget = state.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                                instTarget = state.CurrentInstructions[++indexOfInstruction];
                             }
                             if (tries >= 5)
                             {
@@ -625,7 +625,7 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
-                        var retInst = new ReturnInstruction(state, state.CurrentMethod.Signature!.ReturnsValue);
+                        var retInst = new ReturnInstruction(state, state.CurrentSignature.ReturnsValue);
                         state.InstructionBuilder.Add(retInst, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Dup)
@@ -643,11 +643,11 @@ namespace RegiVM.VMBuilder
                     {
                         var cilLabel = (CilInstructionLabel)inst.Operand!;
                         var instTarget = cilLabel.Instruction!;
-                        var indexOfInstruction = state.CurrentMethod.CilMethodBody!.Instructions.IndexOf(instTarget);
+                        var indexOfInstruction = state.CurrentInstructions.IndexOf(instTarget);
                         var tries = 0;
                         while (!state.InstructionBuilder.IsValidOpCode(instTarget.OpCode.Code) && tries++ < 5)
                         {
-                            instTarget = state.CurrentMethod.CilMethodBody!.Instructions[++indexOfInstruction];
+                            instTarget = state.CurrentInstructions[++indexOfInstruction];
                         }
                         if (tries >= 5)
                         {
@@ -669,8 +669,8 @@ namespace RegiVM.VMBuilder
                         // Always add as used mapping.
                         if (inst.OpCode.Code != CilCode.Leave)
                         {
-                            var handlersForThis = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
-                            var isInSame = state.CurrentMethod.CilMethodBody!.ExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
+                            var handlersForThis = state.CurrentExceptionHandlers.GetProtectedRegionForInstruction(state.ExceptionHandlers, instTarget);
+                            var isInSame = state.CurrentExceptionHandlers.IsInSameProtectedRegion(state.ExceptionHandlers, inst, instTarget);
                             if (!isInSame)
                             {
                                 var closest = handlersForThis.FindClosest(instTarget);
