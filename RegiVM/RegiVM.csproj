@@ -20,6 +20,8 @@
     <ProjectReference Include="..\Echo\src\Core\Echo.DataFlow\Echo.DataFlow.csproj" />
     <ProjectReference Include="..\Echo\src\Core\Echo\Echo.csproj" />
     <ProjectReference Include="..\Echo\src\Platforms\Echo.Platforms.AsmResolver\Echo.Platforms.AsmResolver.csproj" />
+    <ProjectReference Include="..\ProwlynxNET\ProwlynxNET.Core\ProwlynxNET.Core.csproj" />
+    <ProjectReference Include="..\TestVMApp\TestVMApp.csproj" />
   </ItemGroup>
 
 </Project>

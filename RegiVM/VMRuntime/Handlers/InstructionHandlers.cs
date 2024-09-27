@@ -1,5 +1,4 @@
 ﻿using RegiVM.VMBuilder;
-using RegiVM.VMBuilder.Instructions;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -270,7 +269,7 @@ namespace RegiVM.VMRuntime.Handlers
                 byte[] paramRegName = t.ReadBytes(d, ref tracker, out int _);
                 var paramValue = h[new ByteArrayKey(paramRegName)];
                 // TODO: Doing this means that every single reg MUST have a data type associated if it is a primitive type.
-                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : paramValue);
+                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetNumberObject(paramDt, paramValue));
             }
 
             ByteArrayKey returnRegKey = default;

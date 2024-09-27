@@ -5,9 +5,9 @@ namespace RegiVM.VMRuntime
     public delegate int FuncDelegate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                   Dictionary<int, object> p);
 
-    public class FuncDictionary<TKey>
+    public class FuncDictionary
     {
-        private byte[] _other;
+        //private byte[] _other;
         private byte[] _data;
         private int _capacity;
         private int _currentSize;
@@ -19,14 +19,14 @@ namespace RegiVM.VMRuntime
             _currentSize = capacity * 12;
             _data = new byte[_currentSize];
             _lastOffset = 0;
-            _other = [1, 26, 75, 21, 95, 233, 26, 21, 73, 94, 32, 1, 0, 237, 32, 1, 3, 6, 73, 1, 29, 255];
-            for (int i = 0; i < _other.Length; i++)
-            {
-                _data[i] = _other[i];
-            }
+            //_other = [1, 26, 75, 21, 95, 233, 26, 21, 73, 94, 32, 1, 0, 237, 32, 1, 3, 6, 73, 1, 29, 255];
+            //for (int i = 0; i < _other.Length; i++)
+            //{
+            //    _data[i] = _other[i];
+            //}
         }
 
-        public void Add(TKey key, FuncDelegate del)
+        public void Add(ulong key, FuncDelegate del)
         {
             Random r = new(key!.GetHashCode());
 
@@ -52,9 +52,9 @@ namespace RegiVM.VMRuntime
             _lastOffset += 12;
         }
 
-        public FuncDelegate this[TKey key] { get => Get(key); }
+        public FuncDelegate this[ulong key] { get => Get(key); }
 
-        public FuncDelegate Get(TKey key)
+        public FuncDelegate Get(ulong key)
         {
             // Capacity is raw number of.
             int triesMax = _capacity;

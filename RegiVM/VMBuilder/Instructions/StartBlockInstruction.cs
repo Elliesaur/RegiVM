@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 using Echo.Ast;
+using RegiVM.VMRuntime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,14 +11,6 @@ using static RegiVM.VMRuntime.RegiVMRuntime;
 
 namespace RegiVM.VMBuilder.Instructions
 {
-    public enum VMBlockType : byte
-    {
-        Exception = 0x0,
-        Filter = 0x1,
-        Finally = 0x2,
-        Fault = 0x3,
-        Protected = 0x4
-    }
 
     public struct VMExceptionHandler
     {

@@ -17,6 +17,7 @@ using Echo.ControlFlow.Blocks;
 using Echo.ControlFlow.Serialization.Blocks;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.DotNet.Collections;
+using RegiVM.VMRuntime;
 
 namespace RegiVM.VMBuilder
 {

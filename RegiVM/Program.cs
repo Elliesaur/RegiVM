@@ -1,6 +1,9 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
+using ProwlynxNET.Core;
+using ProwlynxNET.Core.Services.Argument;
+using RegiVM.ObfuscationEngine;
 using RegiVM.VMBuilder;
 using RegiVM.VMRuntime;
 using RegiVM.VMRuntime.Handlers;
@@ -9,6 +12,7 @@ using System.Linq.Expressions;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using TestVMApp;
 
 namespace RegiVM
 {
@@ -21,6 +25,58 @@ namespace RegiVM
 
         public static void Main(string[] args)
         {
+            var target = "./AA/TestVMApp/TestVMApp.dll";
+            if (args.Length > 0)
+            {
+                target = args[0];
+            }
+
+            var obf = new Obfuscator();
+            var task = obf.CreateTask(target);
+
+            obf.RunTask(task);
+
+            var parentDir = new FileInfo(task.OutputFile).Directory!.Parent;
+            var currentDir = new FileInfo(task.OutputFile).Directory!.FullName;
+            var outDirName = new FileInfo(task.OutputFile!).DirectoryName + "_protected";
+            var outDir = outDirName;
+            if (!Directory.Exists(outDir))
+            {
+                Directory.CreateDirectory(outDir);
+            }
+            else
+            {
+                // Clear dir.
+                foreach (var file in Directory.GetFiles(outDir))
+                {
+                    File.Delete(file);
+                }
+                // Do not delete dir, leave as-is (empty).
+            }
+
+            foreach (var file in Directory.GetFiles(currentDir))
+            {
+                var fName = Path.GetFileName(file);
+                string inputFName = Path.GetFileName(task.InputFile);
+                if (fName == inputFName)
+                {
+                    // Do not copy
+                    continue;
+                }
+                if (fName.Contains("_regivm"))
+                {
+                    // Change name on output.
+                    File.Copy(file, outDir + "\\" + inputFName);
+                }
+                else
+                {
+                    File.Copy(file, outDir + "\\" + fName);
+                }
+            }
+
+
+            return;
+
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);

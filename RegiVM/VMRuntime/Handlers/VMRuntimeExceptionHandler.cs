@@ -1,6 +1,4 @@
-﻿using RegiVM.VMBuilder.Instructions;
-
-namespace RegiVM.VMRuntime.Handlers
+﻿namespace RegiVM.VMRuntime.Handlers
 {
     public class VMRuntimeExceptionHandler
     {

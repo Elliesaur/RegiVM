@@ -1,9 +1,16 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 
-namespace RegiVM
+namespace TestVMApp
 {
-    internal static class TestProgram
+    public static class TestProgram
     {
+        [Obfuscation(Feature = "RegiVM", Exclude = false)]
+        public static void Main(string[] args)
+        {
+            Console.WriteLine();
+            Console.WriteLine(Call1(10, 20));
+        }
 
         public static void Switch1(int argument1, int argument2)
         {
@@ -71,20 +78,20 @@ namespace RegiVM
             int d = c * 10;
             d = d + arg1;
             d = d - arg2;
-            
+
             return d + c;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
         public static int Math5(int arg1, int arg2)
         {
-            a:
-                int d = arg1;
-                d = d - arg2;
-                if (d == 0)
-                {
-                    goto a;
-                }
+        a:
+            int d = arg1;
+            d = d - arg2;
+            if (d == 0)
+            {
+                goto a;
+            }
             if (d != 34)
             {
                 d = 600;
@@ -256,7 +263,7 @@ namespace RegiVM
             {
                 return 6700;
             }
-            finally 
+            finally
             {
                 arg1 = 0;
                 arg2 = 0;

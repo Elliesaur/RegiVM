@@ -1,5 +1,4 @@
 ﻿using RegiVM.VMBuilder;
-using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMRuntime.Handlers;
 using System.Diagnostics;
 using System.IO.Compression;
@@ -9,9 +8,9 @@ namespace RegiVM.VMRuntime
 {
     public class RegiVMRuntime
     {
-        private ByteArrayKey DATA = new ByteArrayKey([0xff, 0xff, 0x1, 0x2]);
-        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([0xff, 0xff, 0x1, 0x1]);
-        internal ByteArrayKey RETURN_REGISTER = new ByteArrayKey([0xff, 0xff, 0x6, 0x1]);
+        private ByteArrayKey DATA = new ByteArrayKey([BitConverter.GetBytes(255)[0], BitConverter.GetBytes(255)[0], BitConverter.GetBytes(1)[0], BitConverter.GetBytes(2)[0]]);
+        internal ByteArrayKey INSTRUCTION_POINTER = new ByteArrayKey([BitConverter.GetBytes(255)[0], BitConverter.GetBytes(255)[0], BitConverter.GetBytes(1)[0], BitConverter.GetBytes(1)[0]]);
+        internal ByteArrayKey RETURN_REGISTER = new ByteArrayKey([BitConverter.GetBytes(255)[0], BitConverter.GetBytes(255)[0], BitConverter.GetBytes(6)[0], BitConverter.GetBytes(1)[0]]);
 
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
@@ -20,7 +19,7 @@ namespace RegiVM.VMRuntime
         private Dictionary<ByteArrayKey, object> ObjectHeap { get; } = new Dictionary<ByteArrayKey, object>();
 
         // TODO: Calculate max opcode supported.
-        public FuncDictionary<ulong> OpCodeHandlers { get; } = new FuncDictionary<ulong>(50);
+        public FuncDictionary OpCodeHandlers { get; } = new FuncDictionary(50);
 
         public Dictionary<int, object> Parameters { get; } = new Dictionary<int, object>();
 
@@ -252,10 +251,10 @@ namespace RegiVM.VMRuntime
             }
         }
 
-        internal void Run()
+        internal RegiVMRuntime Run()
         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
+            //Stopwatch sw = new Stopwatch();
+            //sw.Start();
             int ip = 0;
 
             // It is the first item, we know there is literally no others.
@@ -276,9 +275,11 @@ namespace RegiVM.VMRuntime
 
                 Heap[INSTRUCTION_POINTER] = BitConverter.GetBytes(ip);
             }
-            sw.Stop();
+            //sw.Stop();
 
-            Console.WriteLine(sw.ElapsedTicks);
+            //Console.WriteLine(sw.ElapsedTicks);
+
+            return this;
         }
 
         internal int GetByteCountForDataType(DataType numType)
@@ -619,6 +620,52 @@ namespace RegiVM.VMRuntime
         internal byte[] GetReturnRegister()
         {
             return Heap[RETURN_REGISTER];
+        }
+
+        internal object GetReturnValue()
+        {
+            if (Heap.ContainsKey(RETURN_REGISTER))
+            {
+                var val = Heap[RETURN_REGISTER];
+                var valKey = new ByteArrayKey(Heap[RETURN_REGISTER]);
+                if (!ObjectHeap.ContainsKey(valKey))
+                {
+                    try
+                    {
+                        switch (val.Length)
+                        {
+                            case 1:
+                                return val[0];
+                            case 2:
+                                Int16 tmp3 = (Int16)GetNumberObject(DataType.Int16, val);
+                                return tmp3;
+                            case 4:
+                                Single tmp1 = Convert.ToSingle(GetNumberObject(DataType.Int32, val));
+                                return tmp1;
+                            case 8:
+                                Double tmp2 = Convert.ToDouble(GetNumberObject(DataType.Int64, val));
+                                return tmp2;
+                        }
+                    }
+                    catch (OverflowException)
+                    {
+                        switch (val.Length)
+                        {
+                            case 4:
+                                UInt32 tmp1 = (UInt32)GetNumberObject(DataType.UInt32, val);
+                                return tmp1;
+                            case 8:
+                                UInt64 tmp2 = (UInt64)GetNumberObject(DataType.UInt64, val);
+                                return tmp2;
+                        }
+                    }
+                }
+                else
+                {
+                    return ObjectHeap[valKey];
+                }
+            }
+            return null!;
         }
     }
 }
