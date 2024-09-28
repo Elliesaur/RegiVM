@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Signatures;
 using ProwlynxNET.Core;
 using ProwlynxNET.Core.Models;
 using ProwlynxNET.Core.Protections;
+using RegiVM.VMBuilder;
 
 namespace RegiVM
 {
@@ -37,9 +38,17 @@ namespace RegiVM
                     .Where(x => x.Namespace!.Contains("VMRuntime")).ToList();
                 // Private implementation details.
                 types.AddRange(allTypes.Where(x => x.Name == "<PrivateImplementationDetails>"));
-                
-                var vmRuntimeType = types.Single(x => x.Name == "RegiVMRuntime");
-                
+
+                // Shuffle methods in types to ensure it is not the same order.
+                foreach (var type in types)
+                {
+                    var originalMethods = type.Methods.Shuffle().ToList();
+                    type.Methods.Clear();
+                    foreach (var m in originalMethods)
+                    {
+                        type.Methods.Add(m);
+                    }
+                }
                 var memberDescriptors = t.Injector.Inject(types, t.Module);
                 foreach (var memberDescriptor in memberDescriptors)
                 {
