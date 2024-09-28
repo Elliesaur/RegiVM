@@ -1,4 +1,5 @@
 ﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Signatures;
 using ProwlynxNET.Core.Models;
 using ProwlynxNET.Core.Protections;
 using RegiVM.VMBuilder;
@@ -28,6 +29,66 @@ namespace RegiVM
                 new RegiVMInjectStage(this),
                 new RegiVMStubMethodsStage(this),
             };
+        }
+
+        public void RenameSubTypes(TypeDefinition typeDef2)
+        {
+            if (!typeDef2.IsCompilerGenerated() || typeDef2.Name.Contains("<>c") || typeDef2.Name.Contains("<>o"))
+            {
+                typeDef2.Name = Guid.NewGuid().ToString();
+                typeDef2.Namespace = "";
+
+                foreach (var method in typeDef2.Methods)
+                {
+                    if (method.IsSpecialName || method.IsConstructor || method.GenericParameters.Count > 0
+                        || method.Signature!.IsGenericInstance || method.IsCompilerGenerated()
+                        || method.DeclaringType!.GenericParameters.Count > 0
+                        || method.Name == "GetHashCode" || method.Name == "Equals")
+                    {
+                        continue;
+                    }
+
+                    method.Name = Guid.NewGuid().ToString();
+                    foreach (var para in method.Parameters)
+                    {
+                        para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
+                    }
+                }
+                foreach (var field in typeDef2.Fields)
+                {
+                    if (!field.Name.Contains("k__BackingField"))
+                    {
+                        if (field.IsCompilerGenerated() || field.IsSpecialName || field.IsRuntimeSpecialName || field.Signature.FieldType is GenericInstanceTypeSignature)
+                        {
+                            continue;
+                        }
+                    }
+                    field.Name = Guid.NewGuid().ToString();
+                }
+                foreach (var prop in typeDef2.Properties)
+                {
+                    if (prop.IsCompilerGenerated() || prop.IsSpecialName || prop.IsRuntimeSpecialName)
+                    {
+                        continue;
+                    }
+                    prop.Name = Guid.NewGuid().ToString();
+                    if (prop.GetMethod != null && prop.GetMethod.DeclaringType!.GenericParameters.Count == 0)
+                    {
+                        prop.GetMethod.Name = Guid.NewGuid().ToString();
+                    }
+                    if (prop.SetMethod != null && prop.SetMethod.DeclaringType!.GenericParameters.Count == 0)
+                    {
+                        prop.SetMethod.Name = Guid.NewGuid().ToString();
+                    }
+                }
+            }
+            if (typeDef2.NestedTypes.Count > 0)
+            {
+                foreach (var subType in typeDef2.NestedTypes)
+                {
+                    RenameSubTypes(subType);
+                }
+            }
         }
 
         public class CompiledMethodDefinition

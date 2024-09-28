@@ -5,6 +5,7 @@ using AsmResolver.PE.DotNet.Cil;
 using ProwlynxNET.Core;
 using ProwlynxNET.Core.Models;
 using ProwlynxNET.Core.Protections;
+using RegiVM.VMBuilder;
 
 namespace RegiVM
 {
@@ -90,16 +91,25 @@ namespace RegiVM
 
                 //var shit = comp.InjectedHandlerAddMethod.DeclaringType.MakeGenericInstanceType(t.Module.CorLibTypeFactory.UInt64);
                 //var memberRef = shit.GenericType.CreateMemberReference(comp.InjectedHandlerAddMethod.Name, comp.InjectedHandlerAddMethod.Signature);
-                
+
                 //var typeDeff = typeSig.Resolve();
+
+                // Move methods over to current type.
+                var handlerMethodsUsed = comp.OpCodes.ToDictionary(k => k, v => comp.InjectedRegiVMInstructionHandlersType.Methods.Single(x => x.Name == opCodeNames[v]));
+                //var parentType = comp.Method.DeclaringType;
+                //foreach (var m in handlerMethodsUsed)
+                //{
+                //    m.Value.DeclaringType = parentType;
+                //}
+
                 foreach (var usedOpCode in comp.OpCodes)
                 {
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Ldloc_0));
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Callvirt, comp.InjectedOpCodeHandlerProperty.GetMethod));
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Ldc_I8, (long)usedOpCode));
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Ldnull));
-                    body.Instructions.Add(new CilInstruction(CilOpCodes.Ldftn, 
-                        comp.InjectedRegiVMInstructionHandlersType.Methods.Single(x => x.Name == opCodeNames[usedOpCode])));
+                    body.Instructions.Add(new CilInstruction(CilOpCodes.Ldftn,
+                        handlerMethodsUsed[usedOpCode]));
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Newobj, comp.InjectedFuncDelegate
                         .Methods.Single(x => x.Name == ".ctor")));
                     body.Instructions.Add(new CilInstruction(CilOpCodes.Callvirt, comp.InjectedHandlerAddMethod));
@@ -134,59 +144,19 @@ namespace RegiVM
                 body.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
                 body.ComputeMaxStack();
 
-                void RenameSubTypes(TypeDefinition typeDef2)
+                // Remove unused handler methods.
+                foreach (var meth in new List<MethodDefinition>(comp.InjectedRegiVMInstructionHandlersType.Methods))
                 {
-                    if (!typeDef2.IsCompilerGenerated())
+                    if (!handlerMethodsUsed.Values.Contains(meth))
                     {
-
-                        typeDef2.Name = Guid.NewGuid().ToString();
-                        typeDef2.Namespace = "";
-
-                        foreach (var method in typeDef2.Methods)
-                        {
-                            if (method.IsSpecialName || method.IsConstructor || method.GenericParameters.Count > 0
-                                || method.Signature!.IsGenericInstance || method.IsCompilerGenerated()
-                                || method.DeclaringType!.GenericParameters.Count > 0)
-                            {
-                                continue;
-                            }
-
-                            method.Name = Guid.NewGuid().ToString();
-                            foreach (var para in method.Parameters)
-                            {
-                                para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
-                            }
-                        }
-                        foreach (var field in typeDef2.Fields)
-                        {
-                            if (field.IsCompilerGenerated() || field.IsSpecialName || field.IsRuntimeSpecialName
-                                || field.Signature.IsGeneric)
-                            {
-                                continue;
-                            }
-                            field.Name = Guid.NewGuid().ToString();
-                        }
-                        foreach (var prop in typeDef2.Properties)
-                        {
-                            if (prop.IsCompilerGenerated() || prop.IsSpecialName || prop.IsRuntimeSpecialName
-                                )
-                            {
-                                continue;
-                            }
-                            prop.Name = Guid.NewGuid().ToString();
-                        }
-                    }
-                    if (typeDef2.NestedTypes.Count > 0)
-                    {
-                        foreach (var subType in typeDef2.NestedTypes)
-                        {
-                            RenameSubTypes(subType);
-                        }
+                        comp.InjectedRegiVMInstructionHandlersType.Methods.Remove(meth);
                     }
                 }
 
                 // Just rename type again.
-                RenameSubTypes(comp.InjectedRegiVMInstructionHandlersType);
+                Parent.RenameSubTypes(comp.InjectedRegiVMInstructionHandlersType);
+
+                //t.Module.TopLevelTypes.Remove(comp.InjectedRegiVMInstructionHandlersType);
             }
         }
 

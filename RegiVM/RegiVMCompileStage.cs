@@ -53,7 +53,7 @@ namespace RegiVM
                 ByteCode = data,
                 Compiler = compiler,
                 Method = method,
-                OpCodes = opcodesUsed
+                OpCodes = opcodesUsed.Shuffle().ToArray()
             });
         }
     }

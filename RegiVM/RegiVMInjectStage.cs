@@ -91,57 +91,9 @@ namespace RegiVM
                                 t.Module.TopLevelTypes.Add(typeDef);
                                 continue;
                             }
-                            void RenameSubTypes(TypeDefinition typeDef2)
-                            {
-                                if (!typeDef2.IsCompilerGenerated())
-                                {
+                            
 
-                                    typeDef2.Name = Guid.NewGuid().ToString();
-                                    typeDef2.Namespace = "";
-
-                                    foreach (var method in typeDef2.Methods)
-                                    {
-                                        if (method.IsSpecialName || method.IsConstructor || method.GenericParameters.Count > 0
-                                            || method.Signature!.IsGenericInstance || method.IsCompilerGenerated()
-                                            || method.DeclaringType!.GenericParameters.Count > 0)
-                                        {
-                                            continue;
-                                        }
-
-                                        //method.Name = Guid.NewGuid().ToString();
-                                        foreach (var para in method.Parameters)
-                                        {
-                                            para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
-                                        }
-                                    }
-                                    foreach (var field in typeDef2.Fields)
-                                    {
-                                        if (field.IsCompilerGenerated() || field.IsSpecialName || field.IsRuntimeSpecialName
-                                            || field.Signature.FieldType is GenericInstanceTypeSignature)
-                                        {
-                                            continue;
-                                        }
-                                        field.Name = Guid.NewGuid().ToString();
-                                    }
-                                    foreach (var prop in typeDef2.Properties)
-                                    {
-                                        if (prop.IsCompilerGenerated() || prop.IsSpecialName || prop.IsRuntimeSpecialName)
-                                        {
-                                            continue;
-                                        }
-                                        prop.Name = Guid.NewGuid().ToString();
-                                    }
-                                }
-                                if (typeDef2.NestedTypes.Count > 0)
-                                {
-                                    foreach (var subType in typeDef2.NestedTypes)
-                                    {
-                                        RenameSubTypes(subType);
-                                    }
-                                }
-                            }
-
-                            RenameSubTypes(typeDef);
+                            Parent.RenameSubTypes(typeDef);
                             t.Module.TopLevelTypes.Add(typeDef);
                         }
                         else if (memberDescriptor is MethodDefinition)
