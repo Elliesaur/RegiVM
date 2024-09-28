@@ -45,6 +45,8 @@ namespace RegiVM.VMBuilder
         public int Push { get; set; }
         public int MethodIndex { get; set; } = 0;
 
+        public int InlineDepth { get; set; } = 0;
+
         public bool EncryptInstructions { get; private set; } = false;
         public bool CompressInstructions { get; private set; } = true;
 
@@ -93,6 +95,16 @@ namespace RegiVM.VMBuilder
             return this;
         }
 
+        public VMCompiler InlineCallDepth(int inlineDepth)
+        {
+            if (inlineDepth - 1 < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(inlineDepth));
+            }
+            InlineDepth = inlineDepth - 1;
+            return this;
+        }
+
 
         /// <summary>
         /// 
@@ -115,28 +127,39 @@ namespace RegiVM.VMBuilder
             }
 
             exceptionHandlers = instructionsToCompile.FindRelatedExceptionHandlers(exceptionHandlers);
+            
+            void FindInlineTargets(IList<CilInstruction> instructionsToCompile, MethodDefinition? methodToCheckForInlineTargets, MethodDefinition? parentMethodDefinition, int depth)
+            {
+                var methodCalls = instructionsToCompile.FindAllCalls();
+                foreach (var methodCall in methodCalls.Where(x => x is MethodDefinition))
+                {
+                    var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
+                    // We must use the parent method definition again to check that it is called by us ONLY.
+                    if (allCallsToMethod.All(x => x == (methodToCheckForInlineTargets ?? parentMethodDefinition)) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
+                    {
+                        // Only called by itself, no other method calls this method.
+                        ViableInlineTargets.Add((MethodDefinition)methodCall);
+                    }
+                }
+                if (depth > 0)
+                {
+                    foreach (var m in ViableInlineTargets.Skip(1).Cast<MethodDefinition>().ToList())
+                    {
+                        FindInlineTargets(m.CilMethodBody.Instructions.ToList(), m, m, --depth);
+                    }
+                }
+            }
 
             // Must add the current parent owner method to ensure no duplicate methods are permitted entry.
             ViableInlineTargets.Add(methodToCheckForInlineTargets ?? parentMethodDefinition);
-
-            var methodCalls = instructionsToCompile.FindAllCalls();
-            foreach (var methodCall in methodCalls.Where(x => x is MethodDefinition))
-            {
-                var allCallsToMethod = ((MethodDefinition)methodCall).FindAllCallsToMethod();
-                // We must use the parent method definition again to check that it is called by us ONLY.
-                if (allCallsToMethod.All(x => x == (methodToCheckForInlineTargets ?? parentMethodDefinition)) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
-                {
-                    // Only called by itself, no other method calls this method.
-                    ViableInlineTargets.Add((MethodDefinition)methodCall);
-                }
-            }
+            FindInlineTargets(instructionsToCompile, methodToCheckForInlineTargets, parentMethodDefinition, InlineDepth);
 
             // Process current instructions.
             CurrentMethodBody = parentBody!;
             CurrentInstructions = instructionsToCompile;
             CurrentSignature = parentMethodDefinition.Signature!;
             CurrentExceptionHandlers = exceptionHandlers;
-            
+
             var sfg = instructionsToCompile.ConstructSymbolicFlowGraph(exceptionHandlers, CurrentMethodBody, out var dfg);
             MethodBlocks = BlockBuilder.ConstructBlocks(sfg);
             MethodStaticFlowGraph = sfg;
@@ -217,6 +240,8 @@ namespace RegiVM.VMBuilder
 
             // TODO: Replace this signature with custom signature for the instructions interacted with.
             return InstructionBuilder.ToByteArray(parentMethodDefinition.Signature!, CompressInstructions, EncryptInstructions);
+
+            
         }
 
         public byte[] Compile(BasicBlock<CilInstruction> block, MethodDefinition parentMethod)

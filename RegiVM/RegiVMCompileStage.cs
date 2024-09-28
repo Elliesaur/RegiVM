@@ -42,6 +42,7 @@ namespace RegiVM
                 .Compress()
                 .Encrypt(false)
                 .RegisterLimit(10)
+                .InlineCallDepth(2)
                 .RandomizeOpCodes()
                 .RandomizeRegisterNames();
 

@@ -47,8 +47,10 @@ namespace RegiVM
                     {
                         continue;
                     }
-
-                    method.Name = Guid.NewGuid().ToString();
+                    else
+                    {
+                        method.Name = Guid.NewGuid().ToString();
+                    }
                     foreach (var para in method.Parameters)
                     {
                         para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
