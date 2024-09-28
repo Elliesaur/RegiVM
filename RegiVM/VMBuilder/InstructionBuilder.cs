@@ -22,6 +22,7 @@ namespace RegiVM.VMBuilder
         private readonly Dictionary<int, List<Tuple<object, ulong>>> _realInstructions = new Dictionary<int, List<Tuple<object, ulong>>>();
         private Dictionary<Tuple<int, int>, Tuple<int, int>> _instructionOffsetMappings = new Dictionary<Tuple<int, int>, Tuple<int, int>>();
         private readonly List<Tuple<int, int>> _usedInstructionIndexes = new List<Tuple<int, int>>();
+        private readonly List<int> _isDivisibleBy = new List<int>();
 
         private readonly VMCompiler _compiler;
         public InstructionBuilder(VMCompiler state)
@@ -80,17 +81,48 @@ namespace RegiVM.VMBuilder
             int currentOffset = startIndex;
             int currentIndex = 0;
             offsetMappings = [];
-
+            if (_isDivisibleBy.Count == 0 && _compiler.EncryptionOption == VMEncryptionType.Random)
+            {
+                // Populate randoms
+                Random r = new Random();
+                int totalNumber = r.Next(20, 70);
+                for (int i = 0; i < totalNumber; i++)
+                {
+                    _isDivisibleBy.Add(r.Next(3, 100));
+                }
+            }
+            if (_isDivisibleBy.Count == 0 && _compiler.EncryptionOption == VMEncryptionType.MultiPathAndLowChance)
+            {
+                _isDivisibleBy.Add(2);
+                _isDivisibleBy.Add(3);
+                _isDivisibleBy.Add(4);
+                _isDivisibleBy.Add(5);
+                _isDivisibleBy.Add(6);
+                _isDivisibleBy.Add(7);
+                _isDivisibleBy.Add(8);
+                _isDivisibleBy.Add(9);
+                _isDivisibleBy.Add(10);
+                _isDivisibleBy.Add(11);
+                _isDivisibleBy.Add(12);
+                _isDivisibleBy.Add(13);
+                _isDivisibleBy.Add(14);
+                _isDivisibleBy.Add(15);
+                _isDivisibleBy.Add(25);
+                _isDivisibleBy.Add(50);
+            }
             // Is first is for the entire current VM instance.
             bool isFirst = true;
             foreach (var kv in _instructions)
             {
-                foreach (var inst in kv.Value)
+                for (int instIndex = 0; instIndex < kv.Value.Count; instIndex++)
                 {
+                    VMInstruction? inst = kv.Value[instIndex];
                     var size = calculateEncrypted ? inst.EncryptedTotalSize : inst.Size;
-                    if (isFirst || inst.IsHandlerStart || 
+                    if (isFirst || inst.IsHandlerStart
                         // If multipath only we do not encrypt those who have zero keys.
-                        (inst.ReferencedByInstruction.Count == 0 && _compiler.EncryptionOption == VMEncryptionType.MultiPathOnly))
+                        || ((inst.ReferencedByInstruction.Count == 0 && _compiler.EncryptionOption == VMEncryptionType.MultiPathOnly)
+                        || (_compiler.EncryptionOption == VMEncryptionType.Random && _isDivisibleBy.Any(x => instIndex % x == 0))
+                        || (_compiler.EncryptionOption == VMEncryptionType.MultiPathAndLowChance && inst.ReferencedByInstruction.Count == 0 && _isDivisibleBy.Any(x => instIndex % x == 0))))
                     {
                         size = inst.Size;
                         inst.Offset = currentOffset;
@@ -295,6 +327,7 @@ namespace RegiVM.VMBuilder
                 {
                     int totalEncrypted = 0;
                     int totalUnencrypted = 0;
+                    Random r = new Random();
                     for (int i = 0; i <= _compiler.MethodIndex; i++)
                     {
                         VMInstruction prevInstruction = null!;
@@ -305,9 +338,12 @@ namespace RegiVM.VMBuilder
                             var mapping = _instructionOffsetMappings[new Tuple<int, int>(i, instIndex)];
 
                             if (instruction.IsHandlerStart || (i == 0 && instIndex == 0)
-                                || (_compiler.EncryptionOption == VMEncryptionType.MultiPathOnly && instruction.ReferencedByInstruction.Count == 0))
+                                || (((_compiler.EncryptionOption == VMEncryptionType.MultiPathOnly) && instruction.ReferencedByInstruction.Count == 0)
+                                || (_compiler.EncryptionOption == VMEncryptionType.Random && _isDivisibleBy.Any(x => instIndex % x == 0))
+                                || (_compiler.EncryptionOption == VMEncryptionType.MultiPathAndLowChance && instruction.ReferencedByInstruction.Count == 0 && _isDivisibleBy.Any(x => instIndex % x == 0))))
                             {
                                 totalUnencrypted++;
+                                Console.WriteLine($"Total Unencrypted: {totalUnencrypted}");
                                 // First instruction!
                                 // Is encrypted = false
                                 writer.Write(false);
@@ -320,6 +356,7 @@ namespace RegiVM.VMBuilder
                             else
                             {
                                 totalEncrypted++;
+                                Console.WriteLine($"Total Encrypted: {totalEncrypted}");
                                 instruction.InitializeMasterKey();
                                 instruction.EncryptCurrentByteCodeAndOperand();
                                 instruction.AddKeys(prevInstruction);

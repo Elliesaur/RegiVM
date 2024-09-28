@@ -9,6 +9,8 @@ namespace RegiVM.VMBuilder
     public enum VMEncryptionType
     {
         MultiPathOnly,
-        FallthroughAndMultiPath
+        FallthroughAndMultiPath,
+        Random,
+        MultiPathAndLowChance
     }
 }
