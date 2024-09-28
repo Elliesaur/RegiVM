@@ -88,7 +88,9 @@ namespace RegiVM.VMBuilder
                 foreach (var inst in kv.Value)
                 {
                     var size = calculateEncrypted ? inst.EncryptedTotalSize : inst.Size;
-                    if (isFirst || inst.IsHandlerStart)
+                    if (isFirst || inst.IsHandlerStart || 
+                        // If multipath only we do not encrypt those who have zero keys.
+                        (inst.ReferencedByInstruction.Count == 0 && _compiler.EncryptionOption == VMEncryptionType.MultiPathOnly))
                     {
                         size = inst.Size;
                         inst.Offset = currentOffset;
@@ -288,10 +290,11 @@ namespace RegiVM.VMBuilder
 
                 // Patch offsets and issues with particular instruction bytecodes.
                 PatchInstructionIndexesAsOffsets();
-
                 // Add encryption over current bytecode.
                 if (useEncryption)
                 {
+                    int totalEncrypted = 0;
+                    int totalUnencrypted = 0;
                     for (int i = 0; i <= _compiler.MethodIndex; i++)
                     {
                         VMInstruction prevInstruction = null!;
@@ -301,8 +304,10 @@ namespace RegiVM.VMBuilder
                             VMInstruction? instruction = _instructions[i][instIndex];
                             var mapping = _instructionOffsetMappings[new Tuple<int, int>(i, instIndex)];
 
-                            if (instruction.IsHandlerStart || (i == 0 && instIndex == 0))
+                            if (instruction.IsHandlerStart || (i == 0 && instIndex == 0)
+                                || (_compiler.EncryptionOption == VMEncryptionType.MultiPathOnly && instruction.ReferencedByInstruction.Count == 0))
                             {
+                                totalUnencrypted++;
                                 // First instruction!
                                 // Is encrypted = false
                                 writer.Write(false);
@@ -314,6 +319,7 @@ namespace RegiVM.VMBuilder
                             }
                             else
                             {
+                                totalEncrypted++;
                                 instruction.InitializeMasterKey();
                                 instruction.EncryptCurrentByteCodeAndOperand();
                                 instruction.AddKeys(prevInstruction);
@@ -330,7 +336,7 @@ namespace RegiVM.VMBuilder
                                 var keyCount = instruction.EncryptionKeys.Count;
                                 writer.Write(keyCount);
 
-                                foreach (var key in instruction.EncryptionKeys)
+                                foreach (var key in instruction.EncryptionKeys.Shuffle())
                                 {
                                     // Write key length (4)
                                     writer.Write(key.Length);
@@ -356,6 +362,10 @@ namespace RegiVM.VMBuilder
                             prevInstruction = instruction;
                         }
                     }
+                    Console.WriteLine($"-------------------------------------------------");
+                    Console.WriteLine($"Total Encrypted Instructions: {totalEncrypted}");
+                    Console.WriteLine($"Total Unencrypted Instructions: {totalUnencrypted}");
+                    Console.WriteLine($"-------------------------------------------------");
                 }
                 else
                 {

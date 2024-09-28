@@ -51,6 +51,7 @@ namespace RegiVM.VMBuilder.Instructions
         public byte[] EncryptedByteCode { get; set;  } = Array.Empty<byte>();
 
         public bool IsHandlerStart { get; set; } = false;
+        public bool IsExemptFromEncryption { get; set; } = false;
 
         /// <summary>
         /// Current offset of the VM Instruction.

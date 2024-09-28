@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using TestVMApp;
 
 namespace RegiVM.VMRuntime.Handlers
@@ -284,8 +285,11 @@ namespace RegiVM.VMRuntime.Handlers
             if (!isInline)
             {
                 int methodToken = methodOffsetToCall;
-
+#if DEBUG
                 var methodBase = typeof(TestProgram).Module.ResolveMethod(methodToken)!;
+#else
+                var methodBase = Assembly.GetExecutingAssembly().Modules.First().ResolveMethod(methodToken)!;
+#endif
                 var hasThis = methodBase!.CallingConvention.HasFlag(CallingConventions.HasThis);
 
                 // TODO: Generics! By Ref! Expression trees cannot support:
@@ -295,8 +299,59 @@ namespace RegiVM.VMRuntime.Handlers
                 var instance = hasThis && methodBase is not ConstructorInfo ? parameters[0] : null;
                 var invokeParams = parameters.Skip(instance == null ? 0 : 1).Select(x => x.Value).ToArray();
                 var eInvokeParams = new ParameterExpression[invokeParams.Length];
+                var paramInfo = methodBase.GetParameters();
                 for (int i = 0; i < invokeParams.Length; i++)
                 {
+                    if (i < paramInfo.Length)
+                    {
+                        var paramI = paramInfo[i];
+                        // If paramI is signed and actual param is unsigned, convert.
+                        if (paramI.ParameterType != invokeParams[i].GetType() 
+                            && paramI.ParameterType.IsPrimitive 
+                            && ((invokeParams[i].GetType().Name.StartsWith("U") 
+                                && paramI.ParameterType.Name.StartsWith("I")) ||
+                                (invokeParams[i].GetType().Name.StartsWith("I")
+                                && paramI.ParameterType.Name.StartsWith("U"))))
+                        {
+                            unchecked
+                            {
+                                switch (paramI.ParameterType.Name)
+                                {
+                                    case "UInt32":
+                                        {
+                                            invokeParams[i] = (UInt32)(Int32)invokeParams[i];
+                                        }
+                                        break;
+                                    case "UInt64":
+                                        {
+                                            invokeParams[i] = (UInt64)(Int64)invokeParams[i];
+                                        }
+                                        break;
+                                    case "Int32":
+                                        {
+                                            invokeParams[i] = (Int32)(UInt32)invokeParams[i];
+                                        }
+                                        break;
+                                    case "Int64":
+                                        {
+                                            invokeParams[i] = (Int64)(UInt64)invokeParams[i];
+                                        }
+                                        break;
+                                    case "Int16":
+                                        {
+                                            invokeParams[i] = (Int16)(UInt16)invokeParams[i];
+                                        }
+                                        break;
+                                    case "UInt16":
+                                        {
+                                            invokeParams[i] = (UInt16)(Int16)invokeParams[i];
+                                        }
+                                        break;
+                                }
+                            }
+                        }
+                    }
+
                     eInvokeParams[i] = Expression.Parameter(invokeParams[i].GetType());
                 }
 
@@ -317,7 +372,7 @@ namespace RegiVM.VMRuntime.Handlers
                 //var result = methodInfo.Invoke(instance, invokeParams);
                 if (hasReturnValue)
                 {
-                    if (result != null && result.GetType().IsPrimitive)
+                    if (result != null && (result.GetType().IsPrimitive))
                     {
                         // TODO: Avoid dynamic, switch on type of primitive?
                         if (!h.ContainsKey(returnRegKey))
@@ -327,6 +382,17 @@ namespace RegiVM.VMRuntime.Handlers
                         else
                         {
                             h[returnRegKey] = BitConverter.GetBytes((dynamic)result);
+                        }
+                    }
+                    else if (result != null && result.GetType() == typeof(string))
+                    {
+                        if (!h.ContainsKey(returnRegKey))
+                        {
+                            h.Add(returnRegKey, Encoding.Unicode.GetBytes((string)result));
+                        }
+                        else
+                        {
+                            h[returnRegKey] = Encoding.Unicode.GetBytes((string)result);
                         }
                     }
                     else
@@ -568,7 +634,7 @@ namespace RegiVM.VMRuntime.Handlers
             int tracker = 0;
             int paramOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
             tracker += 4;
-            Console.WriteLine($"- [PARAMETER LOAD] - > Param OFFSET {paramOffset}");
+            Console.WriteLine($"- [PARAMETER LOAD]");
 
             DataType paramDataType = (DataType)d[tracker++];
             object paramData = p[paramOffset];

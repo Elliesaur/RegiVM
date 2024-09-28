@@ -43,7 +43,7 @@ namespace RegiVM
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .Encrypt(false)
+                .Encrypt(false, VMEncryptionType.FallthroughAndMultiPath)
                 .Compress(true)
                 .InlineCallDepth(2)
                 .RegisterLimit(30);
@@ -136,6 +136,14 @@ namespace RegiVM
                 {
                     del = InstructionHandlers.ConvertNumber;
                 }
+                else if (compiler.OpCodes.Neg == opCode)
+                {
+                    del = InstructionHandlers.Neg;
+                }
+                else if (compiler.OpCodes.Not == opCode)
+                {
+                    del = InstructionHandlers.Not;
+                }
                 else
                 {
                     throw new Exception($"Cannot support '{name}' OpCode");
@@ -147,7 +155,7 @@ namespace RegiVM
 
             //var actualResult = TestProgram.Call1(10, 20);
             //Console.WriteLine(actualResult);
-            TestProgram.Main(null);
+            //TestProgram.Main(null);
 
             vm.Run();
 

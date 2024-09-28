@@ -28,6 +28,8 @@ namespace RegiVM.VMBuilder
         public ulong JumpCall { get; set; } = 0x18000UL;
         public ulong Duplicate { get; set; } = 0x19000UL;
         public ulong ConvertNumber { get; set; } = 0x20000UL;
+        public ulong Neg { get; set; } = 0x21000UL;
+        public ulong Not { get; set; } = 0x22000UL;
         public void RandomizeAll()
         {
             Random r = new Random();

@@ -226,5 +226,58 @@ namespace RegiVM.VMRuntime.Handlers
             }
             return tracker;
         }
+
+        internal static int Neg(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        {
+            // NEG 
+            int tracker = 0;
+            Console.WriteLine("- [Neg]");
+
+            DataType pop1DataType = t.ReadDataType(d, ref tracker);
+
+            byte[] push1 = t.ReadBytes(d, ref tracker, out int push1Length);
+            byte[] pop1 = t.ReadBytes(d, ref tracker, out int pop1Length);
+
+            byte[] val1 = h[new ByteArrayKey(pop1)];
+
+            byte[] endResult = t.PerformNeg(pop1DataType, val1);
+
+            ByteArrayKey result = new ByteArrayKey(push1);
+            if (!h.ContainsKey(result))
+            {
+                h.Add(result, endResult);
+            }
+            else
+            {
+                h[result] = endResult.ToArray();
+            }
+            return tracker;
+        }
+        internal static int Not(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        {
+            // NOT 
+            int tracker = 0;
+            Console.WriteLine("- [Not]");
+
+            DataType pop1DataType = t.ReadDataType(d, ref tracker);
+
+            byte[] push1 = t.ReadBytes(d, ref tracker, out int push1Length);
+            byte[] pop1 = t.ReadBytes(d, ref tracker, out int pop1Length);
+
+            byte[] val1 = h[new ByteArrayKey(pop1)];
+
+            byte[] endResult = t.PerformNot(pop1DataType, val1);
+
+            ByteArrayKey result = new ByteArrayKey(push1);
+            if (!h.ContainsKey(result))
+            {
+                h.Add(result, endResult);
+            }
+            else
+            {
+                h[result] = endResult.ToArray();
+            }
+            return tracker;
+        }
     }
 }

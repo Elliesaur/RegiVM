@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 using RegiVM.VMBuilder.Registers;
+using RegiVM.VMRuntime;
 
 namespace RegiVM.VMBuilder.Instructions
 {
@@ -28,12 +29,34 @@ namespace RegiVM.VMBuilder.Instructions
             ToPushReg = Registers.ForTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
-            ToPushReg.DataType = Reg1.DataType;
+            if (inst.OpCode.Code == CilCode.Div_Un)
+            {
+                if (IsUnsigned(Reg1.DataType))
+                {
+                    ToPushReg.DataType = Reg1.DataType;
+                }
+                else if (IsUnsigned(Reg2.DataType))
+                {
+                    ToPushReg.DataType = Reg2.DataType;
+                }
+                else
+                {
+                    ToPushReg.DataType = DataType.UInt32;
+                }
+            }
+            else
+            {
+                ToPushReg.DataType = Reg1.DataType;
+            }
 
             Inst = inst;
             OpCode = compiler.OpCodes.Div;
 
             ByteCode = ToByteArray();
+        }
+        private bool IsUnsigned(DataType dt)
+        {
+            return (dt == DataType.UInt16 || dt == DataType.UInt32 || dt == DataType.UInt8 || dt == DataType.UInt64);
         }
         public override byte[] ToByteArray()
         {

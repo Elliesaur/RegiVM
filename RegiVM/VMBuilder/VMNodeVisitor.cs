@@ -135,19 +135,27 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.ConvertNumber, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Add)
+                    if (inst.OpCode.Code == CilCode.Neg)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Neg, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Not)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.Not, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Add || inst.OpCode.Code == CilCode.Add_Ovf || inst.OpCode.Code == CilCode.Add_Ovf_Un)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Add, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Sub)
+                    if (inst.OpCode.Code == CilCode.Sub || inst.OpCode.Code == CilCode.Sub_Ovf || inst.OpCode.Code == CilCode.Sub_Ovf_Un)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Sub, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Mul)
+                    if (inst.OpCode.Code == CilCode.Mul || inst.OpCode.Code == CilCode.Mul_Ovf || inst.OpCode.Code == CilCode.Mul_Ovf_Un)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Mul, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Div)
+                    if (inst.OpCode.Code == CilCode.Div || inst.OpCode.Code == CilCode.Div_Un)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.Div, inst, state.MethodIndex);
                     }
@@ -389,22 +397,32 @@ namespace RegiVM.VMBuilder
                         state.InstructionBuilder.Add(convInst, inst, state.MethodIndex);
                     }
                     // TODO: Combine into one math instruction, or use some reflection hacking to get the type name.
-                    if (inst.OpCode.Code == CilCode.Add)
+                    if (inst.OpCode.Code == CilCode.Neg)
+                    {
+                        var negInst = new NegInstruction(state, inst);
+                        state.InstructionBuilder.Add(negInst, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Not)
+                    {
+                        var negInst = new NotInstruction(state, inst);
+                        state.InstructionBuilder.Add(negInst, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Add || inst.OpCode.Code == CilCode.Add_Ovf || inst.OpCode.Code == CilCode.Add_Ovf_Un)
                     {
                         var addInst = new AddInstruction(state, inst);
                         state.InstructionBuilder.Add(addInst, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Sub)
+                    if (inst.OpCode.Code == CilCode.Sub || inst.OpCode.Code == CilCode.Sub_Ovf || inst.OpCode.Code == CilCode.Sub_Ovf_Un)
                     {
                         var subInst = new SubInstruction(state, inst);
                         state.InstructionBuilder.Add(subInst, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Mul)
+                    if (inst.OpCode.Code == CilCode.Mul || inst.OpCode.Code == CilCode.Mul_Ovf || inst.OpCode.Code == CilCode.Mul_Ovf_Un)
                     {
                         var mulInst = new MulInstruction(state, inst);
                         state.InstructionBuilder.Add(mulInst, inst, state.MethodIndex);
                     }
-                    if (inst.OpCode.Code == CilCode.Div)
+                    if (inst.OpCode.Code == CilCode.Div || inst.OpCode.Code == CilCode.Div_Un)
                     {
                         var divInst = new DivInstruction(state, inst);
                         state.InstructionBuilder.Add(divInst, inst, state.MethodIndex);

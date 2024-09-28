@@ -151,6 +151,16 @@ namespace RegiVM
                     {
                         comp.InjectedRegiVMInstructionHandlersType.Methods.Remove(meth);
                     }
+                    foreach (var inst in meth.CilMethodBody!.Instructions)
+                    {
+                        if (inst.OpCode == CilOpCodes.Call && inst.Operand is MemberReference && ((MemberReference)inst.Operand).FullName.Contains("System.Console::WriteLine(System.String)"))
+                        {
+                            int index = meth.CilMethodBody!.Instructions.IndexOf(inst);
+                            // Replace with nop the ldstr + 
+                            inst.ReplaceWithNop();
+                            meth.CilMethodBody!.Instructions[index - 1].ReplaceWithNop();
+                        }
+                    }
                 }
 
                 // Just rename type again.

@@ -549,6 +549,31 @@ namespace RegiVM.VMRuntime
             };
         }
 
+        internal byte[] PerformNeg(DataType leftDataType, byte[] left)
+        {
+            return leftDataType switch
+            {
+                DataType.Int32 => BitConverter.GetBytes(-(Int32)BitConverter.ToInt32(left)),
+                DataType.Int64 => BitConverter.GetBytes(-(Int64)BitConverter.ToInt64(left)),
+                DataType.Int16 => BitConverter.GetBytes(-(Int16)BitConverter.ToInt16(left)),
+                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
+            };
+        }
+
+        internal byte[] PerformNot(DataType leftDataType, byte[] left)
+        {
+            return leftDataType switch
+            {
+                DataType.Int32 => BitConverter.GetBytes((Int32)~BitConverter.ToInt32(left)),
+                DataType.UInt32 => BitConverter.GetBytes((UInt32)~BitConverter.ToUInt32(left)),
+                DataType.Int64 => BitConverter.GetBytes((Int64)~BitConverter.ToInt64(left)),
+                DataType.UInt64 => BitConverter.GetBytes((UInt64)~BitConverter.ToUInt64(left)),
+                DataType.Int8 or DataType.UInt8 => new byte[] { (byte)~left[0] }, // Assuming sbyte for Int8
+                DataType.Int16 => BitConverter.GetBytes((Int16)~BitConverter.ToInt16(left)),
+                DataType.UInt16 => BitConverter.GetBytes((UInt16)~BitConverter.ToUInt16(left)),
+                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
+            };
+        }
         internal byte[] PerformOr(DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
         {
             if (leftDataType != rightDataType)
@@ -674,5 +699,6 @@ namespace RegiVM.VMRuntime
             }
             return null!;
         }
+
     }
 }

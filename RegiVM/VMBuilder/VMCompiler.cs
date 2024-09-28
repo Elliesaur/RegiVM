@@ -13,6 +13,7 @@ using Echo.DataFlow;
 using Echo.DataFlow.Construction;
 using Echo.Platforms.AsmResolver;
 using Microsoft.Win32;
+using ProwlynxNET.Core;
 using RegiVM.VMBuilder.Instructions;
 using RegiVM.VMBuilder.Registers;
 using System;
@@ -48,6 +49,7 @@ namespace RegiVM.VMBuilder
         public int InlineDepth { get; set; } = 0;
 
         public bool EncryptInstructions { get; private set; } = false;
+        public VMEncryptionType EncryptionOption { get; private set; }
         public bool CompressInstructions { get; private set; } = true;
 
         public ScopeBlock<CilInstruction> MethodBlocks { get; private set; }
@@ -55,6 +57,10 @@ namespace RegiVM.VMBuilder
         public DataFlowGraph<CilInstruction> MethodDataFlowGraph { get; private set; }
         public List<VMExceptionHandler> ExceptionHandlers { get; } = new List<VMExceptionHandler>();
         public List<IMethodDefOrRef> ViableInlineTargets { get; private set; } = new List<IMethodDefOrRef>();
+
+        public ObfuscationTask CurrentTask { get; set; } = null!;
+        public RegiVMProtection Protection { get; private set; }
+
         public VMCompiler()
         {
             RegisterHelper = null;
@@ -68,9 +74,10 @@ namespace RegiVM.VMBuilder
             return this;
         }
 
-        public VMCompiler Encrypt(bool encrypt = true)
+        public VMCompiler Encrypt(bool encrypt, VMEncryptionType encType)
         {
             EncryptInstructions = encrypt;
+            EncryptionOption = encType;
             return this;
         }
 
@@ -79,7 +86,12 @@ namespace RegiVM.VMBuilder
             CompressInstructions = compress;
             return this;
         }
-
+        public VMCompiler WithTask(ObfuscationTask task, RegiVMProtection protection)
+        {
+            CurrentTask = task;
+            Protection = protection;
+            return this;
+        }
         public VMCompiler RegisterLimit(int numRegisters)
         {
             if (RegisterHelper == null)
@@ -137,8 +149,15 @@ namespace RegiVM.VMBuilder
                     // We must use the parent method definition again to check that it is called by us ONLY.
                     if (allCallsToMethod.All(x => x == (methodToCheckForInlineTargets ?? parentMethodDefinition)) && !ViableInlineTargets.Contains((MethodDefinition)methodCall))
                     {
-                        // Only called by itself, no other method calls this method.
-                        ViableInlineTargets.Add((MethodDefinition)methodCall);
+                        if (CurrentTask != null && !CurrentTask.Marker.CanProtect(Protection, (MethodDefinition)methodCall, true))
+                        {
+                            Console.WriteLine($"## CANNOT protect method: {methodCall.FullName}!!");
+                        }
+                        else
+                        {
+                            // Only called by itself, no other method calls this method.
+                            ViableInlineTargets.Add((MethodDefinition)methodCall);
+                        }
                     }
                 }
                 if (depth > 0)

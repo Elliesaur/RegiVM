@@ -40,9 +40,10 @@ namespace RegiVM
             // Compile.
             VMCompiler compiler = new VMCompiler()
                 .Compress()
-                .Encrypt(false)
-                .RegisterLimit(10)
+                .Encrypt(true, VMEncryptionType.MultiPathOnly)
+                .RegisterLimit(100000)
                 .InlineCallDepth(2)
+                .WithTask(t, Parent)
                 .RandomizeOpCodes()
                 .RandomizeRegisterNames();
 
