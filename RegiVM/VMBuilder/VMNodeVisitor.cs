@@ -218,6 +218,18 @@ namespace RegiVM.VMBuilder
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
                     }
+                    if (inst.OpCode.Code == CilCode.Ldc_I8)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldc_R4)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldc_R8)
+                    {
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
+                    }
                     if (inst.OpCode.Code == CilCode.Ldstr)
                     {
                         state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
@@ -590,6 +602,30 @@ namespace RegiVM.VMBuilder
                     if (inst.IsLdcI4())
                     {
                         var numLoad = new ConstantLoadInstruction(state, (int)inst.Operand!, DataType.Int32, inst);
+                        state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
+
+                        // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
+                        reg = numLoad.TempReg1;
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldc_I8)
+                    {
+                        var numLoad = new ConstantLoadInstruction(state, (long)inst.Operand!, DataType.Int64, inst);
+                        state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
+
+                        // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
+                        reg = numLoad.TempReg1;
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldc_R4)
+                    {
+                        var numLoad = new ConstantLoadInstruction(state, (float)inst.Operand!, DataType.Single, inst);
+                        state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
+
+                        // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
+                        reg = numLoad.TempReg1;
+                    }
+                    if (inst.OpCode.Code == CilCode.Ldc_R8)
+                    {
+                        var numLoad = new ConstantLoadInstruction(state, (double)inst.Operand!, DataType.Double, inst);
                         state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
 
                         // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
