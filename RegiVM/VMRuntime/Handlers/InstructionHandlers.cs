@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
+using TestVMApp;
 
 namespace RegiVM.VMRuntime.Handlers
 {
@@ -96,15 +97,15 @@ namespace RegiVM.VMRuntime.Handlers
                         isBool = true;
                         break;
                     case 2:
-                        Int16 tmp3 = (Int16)t.GetNumberObject(DataType.Int16, h[shouldBranchReg]);
+                        Int16 tmp3 = (Int16)t.GetConstObject(DataType.Int16, h[shouldBranchReg]);
                         isZero = tmp3 == (Int16)0;
                         break;
                     case 4:
-                        Double tmp1 = Convert.ToDouble(t.GetNumberObject(DataType.Int32, h[shouldBranchReg]));
+                        Double tmp1 = Convert.ToDouble(t.GetConstObject(DataType.Int32, h[shouldBranchReg]));
                         isZero = tmp1 == 0.0d;
                         break;
                     case 8:
-                        Double tmp2 = Convert.ToDouble(t.GetNumberObject(DataType.Int64, h[shouldBranchReg]));
+                        Double tmp2 = Convert.ToDouble(t.GetConstObject(DataType.Int64, h[shouldBranchReg]));
                         isZero = tmp2 == 0.0d;
                         break;
                 }
@@ -114,11 +115,11 @@ namespace RegiVM.VMRuntime.Handlers
                 switch (h[shouldBranchReg].Length)
                 {
                     case 4:
-                        UInt32 tmp1 = (UInt32)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
+                        UInt32 tmp1 = (UInt32)t.GetConstObject(DataType.UInt32, h[shouldBranchReg]);
                         isZero = tmp1 == 0U;
                         break;
                     case 8:
-                        UInt64 tmp2 = (UInt64)t.GetNumberObject(DataType.UInt64, h[shouldBranchReg]);
+                        UInt64 tmp2 = (UInt64)t.GetConstObject(DataType.UInt64, h[shouldBranchReg]);
                         isZero = tmp2 == 0UL;
                         break;
                 }
@@ -131,7 +132,7 @@ namespace RegiVM.VMRuntime.Handlers
 
                 // Switch statement is possibly in the stack.
                 // We do not need to worry about control transfers into protected region blocks.
-                uint value = (uint)t.GetNumberObject(DataType.UInt32, h[shouldBranchReg]);
+                uint value = (uint)t.GetConstObject(DataType.UInt32, h[shouldBranchReg]);
                 if (value < jumpOffsets.Length)
                 {
                     // ECMA: if value is less than n execution is transferred to the valueths target.
@@ -269,7 +270,7 @@ namespace RegiVM.VMRuntime.Handlers
                 byte[] paramRegName = t.ReadBytes(d, ref tracker, out int _);
                 var paramValue = h[new ByteArrayKey(paramRegName)];
                 // TODO: Doing this means that every single reg MUST have a data type associated if it is a primitive type.
-                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetNumberObject(paramDt, paramValue));
+                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetConstObject(paramDt, paramValue));
             }
 
             ByteArrayKey returnRegKey = default;
@@ -284,7 +285,7 @@ namespace RegiVM.VMRuntime.Handlers
             {
                 int methodToken = methodOffsetToCall;
 
-                var methodBase = typeof(RegiVMRuntime).Module.ResolveMethod(methodToken)!;
+                var methodBase = typeof(TestProgram).Module.ResolveMethod(methodToken)!;
                 var hasThis = methodBase!.CallingConvention.HasFlag(CallingConventions.HasThis);
 
                 // TODO: Generics! By Ref! Expression trees cannot support:
@@ -292,7 +293,7 @@ namespace RegiVM.VMRuntime.Handlers
                     https://learn.microsoft.com/en-us/dotnet/csharp/advanced-topics/expression-trees/#limitations
                 */
                 var instance = hasThis && methodBase is not ConstructorInfo ? parameters[0] : null;
-                var invokeParams = parameters.Skip(1).Select(x => x.Value).ToArray();
+                var invokeParams = parameters.Skip(instance == null ? 0 : 1).Select(x => x.Value).ToArray();
                 var eInvokeParams = new ParameterExpression[invokeParams.Length];
                 for (int i = 0; i < invokeParams.Length; i++)
                 {
@@ -436,7 +437,7 @@ namespace RegiVM.VMRuntime.Handlers
             bool throwOverflowException = d[tracker++] == 1 ? true : false;
             bool isUnsignedFrom = d[tracker++] == 1 ? true : false;
 
-            object fromValue = t.GetNumberObject(fromDatatype, h[fromRegKey]);
+            object fromValue = t.GetConstObject(fromDatatype, h[fromRegKey]);
 
             try
             {
@@ -528,7 +529,7 @@ namespace RegiVM.VMRuntime.Handlers
         internal static int NumberLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
                                        Dictionary<int, object> _)
         {
-            Console.WriteLine("- [NUMBER LOAD]");
+            Console.WriteLine("- [CONST LOAD]");
 
             DataType numType = (DataType)d[0];
             int tracker = 1;
@@ -540,8 +541,11 @@ namespace RegiVM.VMRuntime.Handlers
             byte[] register = d.Skip(tracker).Take(registerLength).ToArray();
             tracker += registerLength;
 
-            byte[] value = d.Skip(tracker).Take(numByteToReadForValue).ToArray();
-            tracker += numByteToReadForValue;
+            int stringLength = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            tracker += 4;
+
+            byte[] value = d.Skip(tracker).Take(numByteToReadForValue == -1 ? stringLength : numByteToReadForValue).ToArray();
+            tracker += numByteToReadForValue == -1 ? stringLength : numByteToReadForValue;
 
             ByteArrayKey regKey = new ByteArrayKey(register);
 

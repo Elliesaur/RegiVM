@@ -568,6 +568,7 @@ This is very basic for now, more will be added in time.
 - div
 - mul
 - ldc.i4
+- ldstr
 - ldarg
 - ldloc
 - stloc
@@ -607,7 +608,7 @@ This is very basic for now, more will be added in time.
 - [X] Add support for dup
 - [ ] Add support for pop (there is actually no need for this, but might be nice to have?)
 - [ ] Add support for storing into parameters (starg).
-- [ ] Add support for general objects and passing them as params/loading them onto registers.
+- [X] Add support for general objects and passing them as params/loading them onto registers.
 - [X] Add support for new objects.
 - [ ] Add support for throwing exceptions.
 - [X] Add support for converting between number data types (conv...).

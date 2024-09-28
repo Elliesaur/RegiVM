@@ -8,7 +8,7 @@ namespace TestVMApp
         [Obfuscation(Feature = "RegiVM", Exclude = false)]
         public static void Main(string[] args)
         {
-            Console.WriteLine();
+            Console.WriteLine("Hello!");
             Console.WriteLine(Call1(10, 20));
         }
 

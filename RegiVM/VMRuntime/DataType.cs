@@ -21,6 +21,8 @@
 
         Boolean = 0x12,
 
-        Phi = 0x13
+        Phi = 0x13,
+
+        String = 0x14
     }
 }

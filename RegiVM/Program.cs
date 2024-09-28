@@ -25,62 +25,14 @@ namespace RegiVM
 
         public static void Main(string[] args)
         {
-            var target = "./AA/TestVMApp/TestVMApp.dll";
-            if (args.Length > 0)
-            {
-                target = args[0];
-            }
-
-            var obf = new Obfuscator();
-            var task = obf.CreateTask(target);
-
-            obf.RunTask(task);
-
-            var parentDir = new FileInfo(task.OutputFile).Directory!.Parent;
-            var currentDir = new FileInfo(task.OutputFile).Directory!.FullName;
-            var outDirName = new FileInfo(task.OutputFile!).DirectoryName + "_protected";
-            var outDir = outDirName;
-            if (!Directory.Exists(outDir))
-            {
-                Directory.CreateDirectory(outDir);
-            }
-            else
-            {
-                // Clear dir.
-                foreach (var file in Directory.GetFiles(outDir))
-                {
-                    File.Delete(file);
-                }
-                // Do not delete dir, leave as-is (empty).
-            }
-
-            foreach (var file in Directory.GetFiles(currentDir))
-            {
-                var fName = Path.GetFileName(file);
-                string inputFName = Path.GetFileName(task.InputFile);
-                if (fName == inputFName)
-                {
-                    // Do not copy
-                    continue;
-                }
-                if (fName.Contains("_regivm"))
-                {
-                    // Change name on output.
-                    File.Copy(file, outDir + "\\" + inputFName);
-                }
-                else
-                {
-                    File.Copy(file, outDir + "\\" + fName);
-                }
-            }
-
+            PerformObfuscationTask(args);
 
             return;
 
             ModuleDefinition module = ModuleDefinition.FromModule(typeof(TestProgram).Module);
 
             var testType = module.GetAllTypes().First(x => x.Name == typeof(TestProgram).Name);
-            var testMd = testType.Methods.First(x => x.Name == "Call1");
+            var testMd = testType.Methods.First(x => x.Name == "Main");
             // This MUST be done prior to anything else.
             testMd.CilMethodBody!.Instructions.ExpandMacros();
 
@@ -88,15 +40,15 @@ namespace RegiVM
 
             var blocks = testBlocks.GetAllBlocks();
             var targetBlock = blocks.First();
-            
+
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .Encrypt(true)
+                .Encrypt(false)
                 .Compress(true)
                 .RegisterLimit(30);
             //.RandomizeRegisterNames();
             //byte[] data = compiler.Compile(testMd);
-            
+
             byte[] data = compiler.Compile(testMd);
             ulong[] usedOpCodes = compiler.GetUsedOpCodes();
             var opCodesWithNames = compiler.OpCodes.GetAllOpCodesWithNames();
@@ -192,22 +144,75 @@ namespace RegiVM
                 vm.OpCodeHandlers.Add(opCode, del);
             }
 
-            var actualResult = TestProgram.Call1(10, 60);
-            Console.WriteLine(actualResult);
+            //var actualResult = TestProgram.Call1(10, 20);
+            //Console.WriteLine(actualResult);
+            TestProgram.Main(null);
 
             vm.Run();
 
             try
             {
-                var reg = vm.GetReturnRegister();
-                Console.WriteLine(BitConverter.ToInt32(reg));
+                var reg = vm.GetReturnValue();
+                Console.WriteLine(reg);
             }
             catch (Exception)
             {
                 Console.WriteLine("No return register present!");
             }
-           
+
             Console.ReadKey();
+        }
+
+        private static void PerformObfuscationTask(string[] args)
+        {
+            var target = "./AA/TestVMApp/TestVMApp.dll";
+            if (args.Length > 0)
+            {
+                target = args[0];
+            }
+
+            var obf = new Obfuscator();
+            var task = obf.CreateTask(target);
+
+            obf.RunTask(task);
+
+            var parentDir = new FileInfo(task.OutputFile).Directory!.Parent;
+            var currentDir = new FileInfo(task.OutputFile).Directory!.FullName;
+            var outDirName = new FileInfo(task.OutputFile!).DirectoryName + "_protected";
+            var outDir = outDirName;
+            if (!Directory.Exists(outDir))
+            {
+                Directory.CreateDirectory(outDir);
+            }
+            else
+            {
+                // Clear dir.
+                foreach (var file in Directory.GetFiles(outDir))
+                {
+                    File.Delete(file);
+                }
+                // Do not delete dir, leave as-is (empty).
+            }
+
+            foreach (var file in Directory.GetFiles(currentDir))
+            {
+                var fName = Path.GetFileName(file);
+                string inputFName = Path.GetFileName(task.InputFile);
+                if (fName == inputFName)
+                {
+                    // Do not copy
+                    continue;
+                }
+                if (fName.Contains("_regivm"))
+                {
+                    // Change name on output.
+                    File.Copy(file, outDir + "\\" + inputFName);
+                }
+                else
+                {
+                    File.Copy(file, outDir + "\\" + fName);
+                }
+            }
         }
     }
 }

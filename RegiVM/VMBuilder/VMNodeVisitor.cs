@@ -220,7 +220,7 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.OpCode.Code == CilCode.Ldstr)
                     {
-                        //state.InstructionBuilder.AddDryPass(state.OpCodes.StringLoad, inst);
+                        state.InstructionBuilder.AddDryPass(state.OpCodes.NumberLoad, inst, state.MethodIndex);
                     }
                     if (inst.OpCode.Code == CilCode.Ret)
                     {
@@ -589,7 +589,7 @@ namespace RegiVM.VMBuilder
                     VMRegister reg = null!;
                     if (inst.IsLdcI4())
                     {
-                        var numLoad = new NumLoadInstruction(state, (int)inst.Operand!, DataType.Int32, inst);
+                        var numLoad = new ConstantLoadInstruction(state, (int)inst.Operand!, DataType.Int32, inst);
                         state.InstructionBuilder.Add(numLoad, inst, state.MethodIndex);
 
                         // Return the caller the temp reg for loading num. Used above with add/sub/whatever.
@@ -597,8 +597,9 @@ namespace RegiVM.VMBuilder
                     }
                     if (inst.OpCode.Code == CilCode.Ldstr)
                     {
-                        // TODO: Ldstr support.
-                        // Shouldn't be too hard.
+                        var constLoad = new ConstantLoadInstruction(state, (string)inst.Operand!, DataType.String, inst);
+                        state.InstructionBuilder.Add(constLoad, inst, state.MethodIndex);
+                        reg = constLoad.TempReg1;
                     }
                     if (inst.IsLdloc())
                     {
@@ -656,7 +657,7 @@ namespace RegiVM.VMBuilder
 
                         if (inst.IsUnconditionalBranch())
                         {
-                            var numLoadInst = new NumLoadInstruction(state, true, DataType.Boolean, inst);
+                            var numLoadInst = new ConstantLoadInstruction(state, true, DataType.Boolean, inst);
                             state.InstructionBuilder.Add(numLoadInst, inst, state.MethodIndex);
                         }
                         else if (inst.IsConditionalBranch())

@@ -111,7 +111,7 @@ namespace RegiVM
                                         //method.Name = Guid.NewGuid().ToString();
                                         foreach (var para in method.Parameters)
                                         {
-                                            //para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
+                                            para.GetOrCreateDefinition().Name = Guid.NewGuid().ToString();
                                         }
                                     }
                                     foreach (var field in typeDef2.Fields)

@@ -3,6 +3,7 @@ using RegiVM.VMRuntime.Handlers;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace RegiVM.VMRuntime
 {
@@ -290,6 +291,7 @@ namespace RegiVM.VMRuntime
                 DataType.Int16 or DataType.UInt16 => 2,
                 DataType.Int32 or DataType.UInt32 or DataType.Single => 4,
                 DataType.Int64 or DataType.UInt64 or DataType.Double => 8,
+                DataType.String => -1
                 //_ => throw new ArgumentOutOfRangeException(nameof(numType), $"Unsupported DataType: {numType}")
             };
         }
@@ -355,8 +357,8 @@ namespace RegiVM.VMRuntime
             //if (leftDataType != rightDataType)
             //{
                 // We cannot determine and should not determine the crazy amounts of options.
-            var leftObj = GetNumberObject(leftDataType, left);
-            var rightObj = GetNumberObject(rightDataType, right);
+            var leftObj = GetConstObject(leftDataType, left);
+            var rightObj = GetConstObject(rightDataType, right);
             dynamic leftObjD = leftObj;
             dynamic rightObjD = rightObj;
 
@@ -413,8 +415,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD + rightObjD);
@@ -441,8 +443,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD - rightObjD);
@@ -469,8 +471,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD * rightObjD);
@@ -498,8 +500,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD / rightObjD);
@@ -526,8 +528,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD ^ rightObjD);
@@ -552,8 +554,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD | rightObjD);
@@ -578,8 +580,8 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetNumberObject(leftDataType, left);
-                var rightObj = GetNumberObject(rightDataType, right);
+                var leftObj = GetConstObject(leftDataType, left);
+                var rightObj = GetConstObject(rightDataType, right);
                 dynamic leftObjD = leftObj;
                 dynamic rightObjD = rightObj;
                 return BitConverter.GetBytes(leftObjD & rightObjD);
@@ -598,7 +600,7 @@ namespace RegiVM.VMRuntime
                 //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
-        internal object GetNumberObject(DataType dataType, byte[] val)
+        internal object GetConstObject(DataType dataType, byte[] val)
         {
             return dataType switch
             {
@@ -612,6 +614,7 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.ToUInt16(val),
                 DataType.Single => BitConverter.ToSingle(val),
                 DataType.Double => BitConverter.ToDouble(val),
+                DataType.String => Encoding.Unicode.GetString(val),
                 DataType.Boolean => (bool)(val[0] == 1 ? true : false),
                 _ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
@@ -637,14 +640,16 @@ namespace RegiVM.VMRuntime
                             case 1:
                                 return val[0];
                             case 2:
-                                Int16 tmp3 = (Int16)GetNumberObject(DataType.Int16, val);
+                                Int16 tmp3 = (Int16)GetConstObject(DataType.Int16, val);
                                 return tmp3;
                             case 4:
-                                Single tmp1 = Convert.ToSingle(GetNumberObject(DataType.Int32, val));
+                                Single tmp1 = Convert.ToSingle(GetConstObject(DataType.Int32, val));
                                 return tmp1;
                             case 8:
-                                Double tmp2 = Convert.ToDouble(GetNumberObject(DataType.Int64, val));
+                                Double tmp2 = Convert.ToDouble(GetConstObject(DataType.Int64, val));
                                 return tmp2;
+                            default:
+                                return (string)GetConstObject(DataType.String, val);
                         }
                     }
                     catch (OverflowException)
@@ -652,11 +657,13 @@ namespace RegiVM.VMRuntime
                         switch (val.Length)
                         {
                             case 4:
-                                UInt32 tmp1 = (UInt32)GetNumberObject(DataType.UInt32, val);
+                                UInt32 tmp1 = (UInt32)GetConstObject(DataType.UInt32, val);
                                 return tmp1;
                             case 8:
-                                UInt64 tmp2 = (UInt64)GetNumberObject(DataType.UInt64, val);
+                                UInt64 tmp2 = (UInt64)GetConstObject(DataType.UInt64, val);
                                 return tmp2;
+                            default:
+                                return (string)GetConstObject(DataType.String, val);
                         }
                     }
                 }
