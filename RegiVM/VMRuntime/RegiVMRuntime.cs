@@ -357,8 +357,25 @@ namespace RegiVM.VMRuntime
             //if (leftDataType != rightDataType)
             //{
                 // We cannot determine and should not determine the crazy amounts of options.
-            var leftObj = GetConstObject(leftDataType, left);
-            var rightObj = GetConstObject(rightDataType, right);
+            
+            
+            object leftObj = GetConstObject(leftDataType, left);
+            object rightObj = GetConstObject(rightDataType, right);
+            if (leftObj.GetType() != rightObj.GetType())
+            {
+                leftObj = GetConstObject(leftDataType, left, rightDataType);
+                if (leftObj == null)
+                {
+                    leftObj = GetConstObject(leftDataType, left);
+                    rightObj = GetConstObject(rightDataType, right, leftDataType);
+                    if (rightObj == null)
+                    {
+                        // We failed.
+                        rightObj = GetConstObject(rightDataType, right);
+                    }
+                }
+                
+            }
             dynamic leftObjD = leftObj;
             dynamic rightObjD = rightObj;
 
@@ -443,11 +460,34 @@ namespace RegiVM.VMRuntime
             if (leftDataType != rightDataType)
             {
                 // We cannot determine and should not determine the crazy amounts of options.
-                var leftObj = GetConstObject(leftDataType, left);
-                var rightObj = GetConstObject(rightDataType, right);
-                dynamic leftObjD = leftObj;
-                dynamic rightObjD = rightObj;
-                return BitConverter.GetBytes(leftObjD - rightObjD);
+                // Try convert left side to right side.
+                var leftObj = GetConstObject(leftDataType, left, rightDataType);
+                if (leftObj == null)
+                {
+                    // Try convert right side to left side.
+                    var leftObj2 = GetConstObject(leftDataType, left);
+                    var rightObj2 = GetConstObject(rightDataType, right, leftDataType);
+                    if (rightObj2 == null)
+                    {
+                        var rightObj3 = GetConstObject(rightDataType, right);
+                        dynamic leftObjD3 = leftObj2;
+                        dynamic rightObjD3 = rightObj3;
+                        return BitConverter.GetBytes(leftObjD3 - rightObjD3);
+                    }
+                    else
+                    {
+                        dynamic leftObjD = leftObj2;
+                        dynamic rightObjD = rightObj2;
+                        return BitConverter.GetBytes(leftObjD - rightObjD);
+                    }
+                }
+                else
+                {
+                    var rightObj = GetConstObject(rightDataType, right);
+                    dynamic leftObjD = leftObj;
+                    dynamic rightObjD = rightObj;
+                    return BitConverter.GetBytes(leftObjD - rightObjD);
+                }
             }
 
             return leftDataType switch
@@ -625,24 +665,368 @@ namespace RegiVM.VMRuntime
                 //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
-        internal object GetConstObject(DataType dataType, byte[] val)
+        internal object GetConstObject(DataType dataType, byte[] val, DataType altDataType = DataType.Unknown)
         {
-            return dataType switch
+            if (altDataType != DataType.Unknown && dataType != altDataType)
             {
-                DataType.Int32 => BitConverter.ToInt32(val),
-                DataType.UInt32 => BitConverter.ToUInt32(val),
-                DataType.Int64 => BitConverter.ToInt64(val),
-                DataType.UInt64 => BitConverter.ToUInt64(val),
-                DataType.Int8 => (sbyte)val[0],
-                DataType.UInt8 => val[0],
-                DataType.Int16 => BitConverter.ToInt16(val),
-                DataType.UInt16 => BitConverter.ToUInt16(val),
-                DataType.Single => BitConverter.ToSingle(val),
-                DataType.Double => BitConverter.ToDouble(val),
-                DataType.String => Encoding.Unicode.GetString(val),
-                DataType.Boolean => (bool)(val[0] == 1 ? true : false),
-                _ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
-            };
+                unchecked
+                {
+                    // Convert.
+                    switch (dataType)
+                    {
+                        case DataType.UInt16:
+                            {
+                                UInt16 obj = BitConverter.ToUInt16(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Int32:
+                            {
+                                Int32 obj = BitConverter.ToInt32(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.UInt32:
+                            {
+                                UInt32 obj = BitConverter.ToUInt32(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Int64:
+                            {
+                                Int64 obj = BitConverter.ToInt64(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.UInt64:
+                            {
+                                UInt64 obj = BitConverter.ToUInt64(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Single:
+                            {
+                                float obj = BitConverter.ToSingle(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Double:
+                            {
+                                double obj = BitConverter.ToDouble(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Int8:
+                            {
+                                sbyte obj = (sbyte)val[0];
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.UInt8:
+                            {
+                                byte obj = val[0];
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Int16:
+                            {
+                                Int16 obj = BitConverter.ToInt16(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)obj;
+                                    case DataType.UInt32:
+                                        return (UInt32)obj;
+                                    case DataType.Int64:
+                                        return (Int64)obj;
+                                    case DataType.UInt64:
+                                        return (UInt64)obj;
+                                    case DataType.Single:
+                                        return (float)obj;
+                                    case DataType.Double:
+                                        return (double)obj;
+                                    case DataType.Int8:
+                                        return (sbyte)obj;
+                                    case DataType.UInt8:
+                                        return (byte)obj;
+                                    case DataType.Int16:
+                                        return (Int16)obj;
+                                    case DataType.UInt16:
+                                        return (UInt16)obj;
+                                    case DataType.Boolean:
+                                        return obj == 1;
+                                }
+                            }
+                            break;
+                        case DataType.Boolean:
+                            {
+                                bool obj = BitConverter.ToBoolean(val);
+                                switch (altDataType)
+                                {
+                                    case DataType.Int32:
+                                        return (int)(obj ? 1 : 0);
+                                    case DataType.UInt32:
+                                        return (UInt32)(obj ? 1 : 0);
+                                    case DataType.Int64:
+                                        return (Int64)(obj ? 1 : 0);
+                                    case DataType.UInt64:
+                                        return (UInt64)(obj ? 1 : 0);
+                                    case DataType.Single:
+                                        return (float)(obj ? 1 : 0);
+                                    case DataType.Double:
+                                        return (double)(obj ? 1 : 0);
+                                    case DataType.Int8:
+                                        return (sbyte)(obj ? 1 : 0);
+                                    case DataType.UInt8:
+                                        return (byte)(obj ? 1 : 0);
+                                    case DataType.Int16:
+                                        return (Int16)(obj ? 1 : 0);
+                                    case DataType.UInt16:
+                                        return (UInt16)(obj ? 1 : 0);
+                                    case DataType.Boolean:
+                                        return obj;
+                                }
+                            }
+                            break;
+                    }
+                }
+                return null!;
+            }
+            else
+            {
+                return dataType switch
+                {
+                    DataType.Int32 => BitConverter.ToInt32(val),
+                    DataType.UInt32 => BitConverter.ToUInt32(val),
+                    DataType.Int64 => BitConverter.ToInt64(val),
+                    DataType.UInt64 => BitConverter.ToUInt64(val),
+                    DataType.Int8 => (sbyte)val[0],
+                    DataType.UInt8 => val[0],
+                    DataType.Int16 => BitConverter.ToInt16(val),
+                    DataType.UInt16 => BitConverter.ToUInt16(val),
+                    DataType.Single => BitConverter.ToSingle(val),
+                    DataType.Double => BitConverter.ToDouble(val),
+                    DataType.String => Encoding.Unicode.GetString(val),
+                    DataType.Boolean => (bool)(val[0] == 1 ? true : false),
+                    _ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported: {dataType}")
+                };
+            }
         }
 
         internal byte[] GetReturnRegister()

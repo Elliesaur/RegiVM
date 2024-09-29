@@ -14,7 +14,7 @@ namespace RegiVM.VMBuilder.Instructions
     public class JumpCallInstruction : VMInstruction
     {
         public override ulong OpCode { get; }
-        public List<VMRegister> ArgRegs { get; }
+        public Dictionary<VMRegister, DataType> ArgRegs { get; }
         public VMRegister ReturnReg1 { get; }
         public override byte[] ByteCode { get; set; }
         public int MethodIndexToCall { get; }
@@ -24,7 +24,7 @@ namespace RegiVM.VMBuilder.Instructions
         {
             MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
-            ArgRegs = new List<VMRegister>();
+            ArgRegs = new Dictionary<VMRegister, DataType>();
             OpCode = compiler.OpCodes.JumpCall;
             MethodIndexToCall = methodIndexToCall;
             IsInlineCall = isInlineCall;
@@ -38,12 +38,36 @@ namespace RegiVM.VMBuilder.Instructions
                 // Remove one parameter for newobj .ctor calls.
                 paramCount--;
             }
+            var paramTypes = target.Signature!.ParameterTypes.Reverse().ToArray();
             for (int i = 0; i < paramCount; i++)
             {
-                ArgRegs.Add(Registers.Temporary.Pop());
+                var paramIndex = inst.OpCode.Code == CilCode.Newobj ? i + 1 : i;
+                var tempArg = Registers.Temporary.Pop();
+                if (paramIndex < paramTypes.Length)
+                {
+                    var paramType = paramTypes[paramIndex];
+                    var typeName = paramType.ToTypeDefOrRef().Name;
+                    if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
+                    {
+                        ArgRegs.Add(tempArg, tempArg.DataType);
+                    }
+                    else if (tempArg.DataType != (DataType)dataType)
+                    {
+                        ArgRegs.Add(tempArg, (DataType)dataType);
+                    }
+                    else
+                    {
+                        ArgRegs.Add(tempArg, tempArg.DataType);
+                    }
+                }
+                else
+                {
+                    ArgRegs.Add(tempArg, tempArg.DataType);
+                }
+
             }
             // Reverse order for proper assignments.
-            ArgRegs.Reverse();
+            ArgRegs = ArgRegs.Reverse().ToDictionary();
 
             if (inst.OpCode.Code == CilCode.Newobj)
             {
@@ -84,9 +108,10 @@ namespace RegiVM.VMBuilder.Instructions
                 foreach (var arg in ArgRegs)
                 {
                     // Writer registers to use in call.
-                    writer.Write((byte)arg.DataType);
-                    writer.Write(arg.RawName.Length);
-                    writer.Write(arg.RawName);
+                    writer.Write((byte)arg.Key.DataType);
+                    writer.Write((byte)arg.Value);
+                    writer.Write(arg.Key.RawName.Length);
+                    writer.Write(arg.Key.RawName);
                 }
                 if (ReturnReg1 != null)
                 {

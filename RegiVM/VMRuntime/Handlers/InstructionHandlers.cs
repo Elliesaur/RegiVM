@@ -268,10 +268,11 @@ namespace RegiVM.VMRuntime.Handlers
             for (int i = 0; i < numParams; i++)
             {
                 DataType paramDt = t.ReadDataType(d, ref tracker);
+                DataType paramDtReal = t.ReadDataType(d, ref tracker);
                 byte[] paramRegName = t.ReadBytes(d, ref tracker, out int _);
                 var paramValue = h[new ByteArrayKey(paramRegName)];
                 // TODO: Doing this means that every single reg MUST have a data type associated if it is a primitive type.
-                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetConstObject(paramDt, paramValue));
+                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetConstObject(paramDt, paramValue, paramDtReal));
             }
 
             ByteArrayKey returnRegKey = default;
