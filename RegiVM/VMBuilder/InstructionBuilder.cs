@@ -266,13 +266,18 @@ namespace RegiVM.VMBuilder
                                     // Likely an external reference.
                                     continue;
                                 }
+
+                                // We actually retrieve the fallthrough for this instruction.
+                                // This can happen if there is a loop and the fallthrough is called then the inst we are targeting.
+                                // We need to probably look into loop detection.
+                                var instForReferencePrev = _instructions[inst.MethodIndex][reference - 1];
                                 var instForReference = _instructions[inst.MethodIndex][reference];
 
-                                // This must be done after offsets are calculated.
-                                //var offsets = _instructionOffsetMappings[new Tuple<int, int>(inst.MethodIndex, reference)];
-                                //instForReference.ReferencedBy.Add(offsets.Item1);
                                 instForReference.ReferencedByInstruction.Add(inst);
                                 inst.ReferencesInstructions.Add(instForReference);
+
+                                // Add fallthrough just 'in case'... Sad but have to.
+                                instForReference.ReferencedByInstruction.Add(instForReferencePrev);
                             }
                         }
                     }
@@ -322,6 +327,7 @@ namespace RegiVM.VMBuilder
 
                 // Patch offsets and issues with particular instruction bytecodes.
                 PatchInstructionIndexesAsOffsets();
+
                 // Add encryption over current bytecode.
                 if (useEncryption)
                 {
