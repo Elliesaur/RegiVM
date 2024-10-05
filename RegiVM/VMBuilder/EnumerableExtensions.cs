@@ -18,6 +18,7 @@ using Echo.ControlFlow.Serialization.Blocks;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.DotNet.Collections;
 using RegiVM.VMRuntime;
+using AsmResolver;
 
 namespace RegiVM.VMBuilder
 {
@@ -54,6 +55,32 @@ namespace RegiVM.VMBuilder
             return (VMBlockType)exceptionHandlerType;
         }
 
+        public static DataType ToVMDataType(this MethodSignature sig)
+        {
+            var typeName = sig.ReturnType.ToTypeDefOrRef().Name;
+            return typeName!.ToVMDataType();
+        }
+
+        public static DataType ToVMDataType(this ITypeDefOrRef typeDef)
+        {
+            var typeName = typeDef.Name;
+            return typeName!.ToVMDataType();
+        }
+
+        public static DataType ToVMDataType(this Utf8String typeName)
+        {
+            if (!Enum.TryParse(typeof(DataType), typeName.Value, true, out var dataType))
+            {
+                if (typeName == "Char")
+                {
+                    // Technically just a ushort.
+                    return DataType.UInt16;
+                }
+                return DataType.Unknown;
+            }
+            return (DataType)dataType;
+        }
+        
         public static List<(CilExceptionHandler, VMExceptionHandler)> GetProtectedRegionForInstruction(this IList<CilExceptionHandler> handlers, List<VMExceptionHandler> vmHandlers, CilInstruction instTarget)
         {
             var results = new List<(CilExceptionHandler, VMExceptionHandler)>();

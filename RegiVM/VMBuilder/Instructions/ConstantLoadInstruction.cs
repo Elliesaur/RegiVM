@@ -23,7 +23,7 @@ namespace RegiVM.VMBuilder.Instructions
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.NumberLoad;
 
-            TempReg1 = Registers.ForTemp();
+            TempReg1 = Registers.PushTemp();
             TempReg1.DataType = ValueType;
 
             if (numType == DataType.Boolean)

@@ -18,8 +18,8 @@ namespace RegiVM.VMBuilder.Instructions
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.Duplicate;
 
-            var topStack = Registers.Temporary.Peek();
-            var newTop = Registers.ForTemp();
+            var topStack = Registers.PeekTemp();
+            var newTop = Registers.PushTemp();
             newTop.TempCopyFrom(topStack);
 
             ToReg1 = newTop;

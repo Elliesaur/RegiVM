@@ -308,7 +308,7 @@ namespace RegiVM.VMBuilder
                 // The AST has no idea how to handle the stack because technically something is pushed to the stack in runtime!!
                 //var phiInst = new LoadPhiInstruction(state);
                 //state.InstructionBuilder.Add(phiInst);
-                var temp = state.RegisterHelper.ForTemp();
+                var temp = state.RegisterHelper.PushTemp();
                 temp.DataType = DataType.Phi;
                 return temp;
             }
@@ -665,12 +665,7 @@ namespace RegiVM.VMBuilder
                     {
                         // If this fails we're pretty fucked.
                         var param = (Parameter)inst.Operand!;
-                        var typeName = param.ParameterType.ToTypeDefOrRef().Name;
-                        DataType dataType = DataType.Unknown;
-                        if (Enum.TryParse(typeof(DataType), typeName, true, out var dataTypeOut))
-                        {
-                            dataType = (DataType)dataTypeOut;
-                        }
+                        DataType dataType = param.ParameterType.ToTypeDefOrRef().ToVMDataType();
                         var ldargInst = new ParamLoadInstruction(state, param.MethodSignatureIndex, dataType, param, inst);
                         state.InstructionBuilder.Add(ldargInst, inst, state.MethodIndex);
                         

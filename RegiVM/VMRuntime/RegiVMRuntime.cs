@@ -331,6 +331,7 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.GetBytes((UInt16)paramData),
                 DataType.Single => BitConverter.GetBytes((Single)paramData),
                 DataType.Double => BitConverter.GetBytes((Double)paramData),
+                DataType.String => Encoding.Unicode.GetBytes((string)paramData),
                 DataType.Unknown => null!
             };
         }

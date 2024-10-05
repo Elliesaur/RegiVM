@@ -22,7 +22,7 @@ namespace RegiVM.VMBuilder.Instructions
             OpCode = compiler.OpCodes.LoadOrStoreRegister;
             LocalVar = localVar;
 
-            TempReg1 = Registers.Temporary.Pop();
+            TempReg1 = Registers.PopTemp();
 
             if (Registers.Registers.Any(x => x.LocalVar == localVar))
             {

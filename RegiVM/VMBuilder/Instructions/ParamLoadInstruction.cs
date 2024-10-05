@@ -19,7 +19,8 @@ namespace RegiVM.VMBuilder.Instructions
             
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ParameterLoad;
-            TempReg1 = Registers.ForTemp();
+
+            TempReg1 = Registers.PushTemp();
             TempReg1.Param = param;
             TempReg1.LastOffsetUsed = inst.Offset;
             TempReg1.OriginalOffset = inst.Offset;

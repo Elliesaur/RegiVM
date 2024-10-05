@@ -19,11 +19,14 @@ namespace RegiVM.VMBuilder.Registers
 
         private int _numTempTotalLife = 0;
 
+        //private List<string> _guidTempList = new List<string>();
+
         public RegisterHelper(int numRegisters)
         {
             for (int i = 0; i < numRegisters; i++)
             {
                 Registers.Add(new VMRegister($"R{i}", RegisterType.LocalVariable));
+                //_guidTempList.Add(Guid.NewGuid().ToString());
             }
         }
 
@@ -35,10 +38,21 @@ namespace RegiVM.VMBuilder.Registers
             return reg;
         }
 
-        public VMRegister ForTemp()
+        public VMRegister PushTemp()
         {
-            var reg = new VMRegister(IsRandomNames ? $"{Guid.NewGuid().ToString()}" : $"T{_numTempTotalLife++}", RegisterType.Temporary);
+            string newGuid = Guid.NewGuid().ToString();//_guidTempList[_numTempTotalLife++];
+            var reg = new VMRegister(IsRandomNames ? $"{newGuid}" : $"T{_numTempTotalLife++}", RegisterType.Temporary);
             Temporary.Push(reg);
+            return reg;
+        }
+
+        public VMRegister PopTemp()
+        {
+            var reg = Temporary.Pop();
+
+            // Reduce total number to match current stack.
+            //_numTempTotalLife--;
+
             return reg;
         }
 
@@ -77,6 +91,11 @@ namespace RegiVM.VMBuilder.Registers
                 reg.RawName = VMRegister.ToUtf8Bytes(reg.Name);
             }
             IsRandomNames = true;
+        }
+
+        public VMRegister PeekTemp()
+        {
+            return Temporary.Peek();
         }
     }
 }

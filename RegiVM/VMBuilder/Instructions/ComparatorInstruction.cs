@@ -21,13 +21,13 @@ namespace RegiVM.VMBuilder.Instructions
             CompType = compType;
 
             // Get last two registers.
-            var rawReg2 = Registers.Temporary.Pop();
-            var rawReg1 = Registers.Temporary.Pop();
+            var rawReg2 = Registers.PopTemp();
+            var rawReg1 = Registers.PopTemp();
+
             Reg1 = new VMRegister(rawReg1);
             Reg2 = new VMRegister(rawReg2);
 
-
-            ToPushReg = Registers.ForTemp();
+            ToPushReg = Registers.PushTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
             ToPushReg.DataType = DataType.Boolean;

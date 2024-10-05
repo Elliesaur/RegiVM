@@ -42,18 +42,22 @@ namespace RegiVM.VMBuilder.Instructions
             for (int i = 0; i < paramCount; i++)
             {
                 var paramIndex = inst.OpCode.Code == CilCode.Newobj ? i + 1 : i;
-                var tempArg = Registers.Temporary.Pop();
+                var tempArg = Registers.PopTemp();
                 if (paramIndex < paramTypes.Length)
                 {
                     var paramType = paramTypes[paramIndex];
-                    var typeName = paramType.ToTypeDefOrRef().Name;
-                    if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
+
+                    // Is not valid data type?
+                    var paramDataType = paramType.ToTypeDefOrRef().ToVMDataType();
+
+                    // If it did not succeed to get a datatype, treat the temp args data type as real.
+                    if (paramDataType == DataType.Unknown)
                     {
                         ArgRegs.Add(tempArg, tempArg.DataType);
                     }
-                    else if (tempArg.DataType != (DataType)dataType)
+                    else if (tempArg.DataType != paramDataType)
                     {
-                        ArgRegs.Add(tempArg, (DataType)dataType);
+                        ArgRegs.Add(tempArg, paramDataType);
                     }
                     else
                     {
@@ -72,22 +76,13 @@ namespace RegiVM.VMBuilder.Instructions
             if (inst.OpCode.Code == CilCode.Newobj)
             {
                 // Newobj always pushes a value to stack.
-                ReturnReg1 = Registers.ForTemp();
+                ReturnReg1 = Registers.PushTemp();
                 ReturnReg1.DataType = DataType.Unknown;
             }
             else if (target.Signature!.ReturnsValue)
             {
-                ReturnReg1 = Registers.ForTemp();
-                var typeName = target.Signature!.ReturnType.ToTypeDefOrRef().Name;
-                if (!Enum.TryParse(typeof(DataType), typeName, true, out var dataType))
-                {
-                    // Object return type likely.
-                    ReturnReg1.DataType = DataType.Unknown;
-                }
-                else
-                {
-                    ReturnReg1.DataType = (DataType)dataType;
-                }
+                ReturnReg1 = Registers.PushTemp();
+                ReturnReg1.DataType = target.Signature!.ToVMDataType();
             }
 
             ByteCode = ToByteArray();
@@ -115,7 +110,7 @@ namespace RegiVM.VMBuilder.Instructions
                 }
                 if (ReturnReg1 != null)
                 {
-                    writer.Write((byte)ReturnReg1.DataType);
+                    //writer.Write((byte)ReturnReg1.DataType);
                     writer.Write(ReturnReg1.RawName.Length);
                     writer.Write(ReturnReg1.RawName);
                 }

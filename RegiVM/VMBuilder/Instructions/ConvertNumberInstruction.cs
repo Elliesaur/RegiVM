@@ -21,9 +21,9 @@ namespace RegiVM.VMBuilder.Instructions
             Registers = compiler.RegisterHelper;
             OpCode = compiler.OpCodes.ConvertNumber;
 
-            var num = Registers.Temporary.Pop();
+            var num = Registers.PopTemp();
             FromReg1 = num;
-            ToReg1 = Registers.ForTemp();
+            ToReg1 = Registers.PushTemp();
 
             switch (inst.OpCode.Code)
             {

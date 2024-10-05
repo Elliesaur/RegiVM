@@ -22,7 +22,7 @@ namespace RegiVM.VMBuilder.Instructions
 
             // TODO: Change ShouldJump to registry entry and pull from that instead.
             // Load a number (boolean) into registry prior if it is unconditional branching.
-            TempReg1 = Registers.Temporary.Pop();
+            TempReg1 = Registers.PopTemp();
 
             if (inst.OpCode.Code == CilCode.Brfalse) 
             {

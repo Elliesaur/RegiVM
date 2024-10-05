@@ -198,7 +198,7 @@ namespace RegiVM.VMRuntime.Handlers
                         {
                             t.ExceptionHandlers.Remove(sameRegionHandler);
                         }
-                        if (t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
+                        if (t.ExceptionHandlers.Count > 0 && t.ExceptionHandlers.Peek().Type == VMBlockType.Finally)
                         {
                             // Treat as finally.
                             var finallyClause = t.ExceptionHandlers.Pop();
@@ -208,6 +208,11 @@ namespace RegiVM.VMRuntime.Handlers
                             // Store the active leave inst offset so we know where to go after the endfinally instruction.
                             t.ActiveExceptionHandler.LeaveInstOffset = branchToOffsetValue;
                         }
+                        // Well, we don't have any finally handlers, let's just leave to the branch target.
+                        else if (t.ExceptionHandlers.Count == 0)
+                        {
+                            tracker = branchToOffsetValue;
+                        } 
                     }
                     else if (shouldBranch)
                     {
@@ -272,13 +277,25 @@ namespace RegiVM.VMRuntime.Handlers
                 byte[] paramRegName = t.ReadBytes(d, ref tracker, out int _);
                 var paramValue = h[new ByteArrayKey(paramRegName)];
                 // TODO: Doing this means that every single reg MUST have a data type associated if it is a primitive type.
-                parameters.Add(i, paramDt == DataType.Unknown ? t.GetObject(paramValue) : t.GetConstObject(paramDt, paramValue, paramDtReal));
+                if (paramDt == DataType.Unknown)
+                {
+                    parameters.Add(i, t.GetObject(paramValue));
+                }
+                else if (paramDt == DataType.Phi)
+                {
+                    // Load exception object onto param list.
+                    parameters.Add(i, t.GetObject(t.ActiveExceptionHandler.ExceptionTypeObjectKey));
+                }
+                else
+                {
+                    parameters.Add(i, t.GetConstObject(paramDt, paramValue, paramDtReal));
+                }
             }
 
             ByteArrayKey returnRegKey = default;
             if (hasReturnValue)
             {
-                DataType dt = t.ReadDataType(d, ref tracker);
+                //DataType dt = t.ReadDataType(d, ref tracker);
                 byte[] returnRegName = t.ReadBytes(d, ref tracker, out int _);
                 returnRegKey = new ByteArrayKey(returnRegName);
             }
@@ -350,6 +367,14 @@ namespace RegiVM.VMRuntime.Handlers
                                         break;
                                 }
                             }
+                        }
+
+                        // Special conversion of uint16 to char.
+                        if (paramI.ParameterType != invokeParams[i].GetType()
+                            && invokeParams[i].GetType().Name.StartsWith("UInt16")
+                            && paramI.ParameterType.Name.StartsWith("Char"))
+                        {
+                            invokeParams[i] = (char)(UInt16)invokeParams[i];
                         }
                     }
 
@@ -671,6 +696,7 @@ namespace RegiVM.VMRuntime.Handlers
             ByteArrayKey result = default;
             if (hasValue)
             {
+                //DataType retDt = t.ReadDataType(d, ref tracker);
                 byte[] retValueReg = t.ReadBytes(d, ref tracker, out int _);
                 result = new ByteArrayKey(retValueReg);
             }

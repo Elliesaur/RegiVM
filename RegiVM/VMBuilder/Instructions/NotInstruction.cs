@@ -16,10 +16,10 @@ namespace RegiVM.VMBuilder.Instructions
             MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
 
-            var rawReg1 = Registers.Temporary.Pop();
+            var rawReg1 = Registers.PopTemp();
             Reg1 = new VMRegister(rawReg1);
 
-            ToPushReg = Registers.ForTemp();
+            ToPushReg = Registers.PushTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
             ToPushReg.DataType = Reg1.DataType;

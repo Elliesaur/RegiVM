@@ -18,15 +18,15 @@ namespace RegiVM.VMBuilder.Instructions
         {
             MethodIndex = compiler.MethodIndex;
             Registers = compiler.RegisterHelper;
+
             // Get last two registers.
-            var rawReg2 = Registers.Temporary.Pop();
-            var rawReg1 = Registers.Temporary.Pop();
+            var rawReg2 = Registers.PopTemp();
+            var rawReg1 = Registers.PopTemp();
+
             Reg1 = new VMRegister(rawReg1);
             Reg2 = new VMRegister(rawReg2);
 
-            //Registers.Reset([rawReg1, rawReg2]);
-
-            ToPushReg = Registers.ForTemp();
+            ToPushReg = Registers.PushTemp();
             ToPushReg.LastOffsetUsed = inst.Offset;
             ToPushReg.OriginalOffset = inst.Offset;
             if (inst.OpCode.Code == CilCode.Div_Un)

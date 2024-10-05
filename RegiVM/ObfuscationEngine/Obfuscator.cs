@@ -77,9 +77,19 @@ namespace RegiVM.ObfuscationEngine
             var imageBuilder = new ManagedPEImageBuilder();
 
             var factory = new DotNetDirectoryFactory();
-            factory.MetadataBuilderFlags = MetadataBuilderFlags.PreserveAll;
-            factory.MetadataBuilderFlags |= MetadataBuilderFlags.PreserveUnknownStreams;
-            factory.MetadataBuilderFlags |= MetadataBuilderFlags.PreserveTableIndices;
+            factory.MetadataBuilderFlags = MetadataBuilderFlags.PreserveMemberReferenceIndices
+                | MetadataBuilderFlags.PreserveMethodDefinitionIndices
+                | MetadataBuilderFlags.PreserveAssemblyReferenceIndices
+                | MetadataBuilderFlags.PreserveModuleReferenceIndices
+                | MetadataBuilderFlags.PreserveEventDefinitionIndices
+                | MetadataBuilderFlags.PreserveFieldDefinitionIndices
+                | MetadataBuilderFlags.PreservePropertyDefinitionIndices
+                | MetadataBuilderFlags.PreserveTypeDefinitionIndices
+                | MetadataBuilderFlags.PreserveTypeReferenceIndices
+                | MetadataBuilderFlags.PreserveTypeSpecificationIndices;
+            //factory.MetadataBuilderFlags = MetadataBuilderFlags.PreserveAll;
+            //factory.MetadataBuilderFlags |= MetadataBuilderFlags.PreserveUnknownStreams;
+            //factory.MetadataBuilderFlags |= MetadataBuilderFlags.PreserveTableIndices;
             factory.MethodBodySerializer = new CilMethodBodySerializer
             {
                 ComputeMaxStackOnBuildOverride = true

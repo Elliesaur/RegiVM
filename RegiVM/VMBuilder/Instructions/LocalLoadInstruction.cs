@@ -22,7 +22,7 @@ namespace RegiVM.VMBuilder.Instructions
             Reg1 = Registers.Registers.First(x => x.LocalVar == localVar);
             Reg1.LastOffsetUsed = Inst.Offset;
 
-            TempReg1 = Registers.ForTemp();
+            TempReg1 = Registers.PushTemp();
             TempReg1.TempCopyFrom(Reg1);
 
             ByteCode = ToByteArray();
