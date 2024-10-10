@@ -2,7 +2,7 @@
 
 namespace RegiVM.VMRuntime
 {
-    public delegate int FuncDelegate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+    public delegate int FuncDelegate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                   Dictionary<int, object> p);
 
     public class FuncDictionary
@@ -101,29 +101,5 @@ namespace RegiVM.VMRuntime
             _currentSize += (numToAdd * 12);
             Array.Resize(ref _data, _currentSize);
         }
-
-        //protected virtual void Dispose(bool disposing)
-        //{
-        //    if (!_disposedValue)
-        //    {
-        //        if (disposing)
-        //        {
-        //            // TODO: dispose managed state (managed objects)
-        //        }
-        //        Marshal.FreeHGlobal(_dataPtr);
-        //        _disposedValue = true;
-        //    }
-        //}
-
-        //~ActionDictionary()
-        //{
-        //    Dispose(disposing: false);
-        //}
-
-        //public void Dispose()
-        //{
-        //    Dispose(disposing: true);
-        //    GC.SuppressFinalize(this);
-        //}
     }
 }

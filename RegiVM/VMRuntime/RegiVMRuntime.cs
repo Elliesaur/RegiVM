@@ -48,14 +48,17 @@ namespace RegiVM.VMRuntime
                 {
                     gzipStream.CopyTo(uncompressedStream);
                 }
+
                 // Reuse arg.
                 data = uncompressedStream.ToArray();
+                
+                ReadOnlySpan<byte> sData = data;
+
                 int track = 0;
 
-                bool hasReturnValue = data.Skip(track).Take(1).ToArray()[0] == 1 ? true : false;
-                track += 1;
+                bool hasReturnValue = sData[track++] == 1;
 
-                int numParams = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                int numParams = BitConverter.ToInt32(sData.Slice(track, 4));
                 track += 4;
 
                 MethodSignatures.Push(new VMMethodSig
@@ -65,16 +68,17 @@ namespace RegiVM.VMRuntime
                     ParamCount = numParams
                 });
 
-                Heap.Add(DATA, data.Skip(track).ToArray());
+                Heap.Add(DATA, sData.Slice(track).ToArray());
             }
             else
             {
+                ReadOnlySpan<byte> sData = data;
+
                 int track = 0;
 
-                bool hasReturnValue = data.Skip(track).Take(1).ToArray()[0] == 1 ? true : false;
-                track += 1;
+                bool hasReturnValue = sData[track++] == 1;
 
-                int numParams = BitConverter.ToInt32(data.Skip(track).Take(4).ToArray());
+                int numParams = BitConverter.ToInt32(sData.Slice(track, 4));
                 track += 4;
 
                 MethodSignatures.Push(new VMMethodSig
@@ -84,7 +88,7 @@ namespace RegiVM.VMRuntime
                     ParamCount = numParams
                 });
 
-                Heap.Add(DATA, data.Skip(track).ToArray());
+                Heap.Add(DATA, sData.Slice(track).ToArray());
             }
             for (int i = 0; i < parameters.Length; i++)
             {
@@ -95,13 +99,12 @@ namespace RegiVM.VMRuntime
         internal void Step(ref int ip)
         {
             byte[] data = Heap[DATA];
+            ReadOnlySpan<byte> sData = data;
+            ReadOnlySpan<byte> operandValue;
 
             ulong opCode = 0;
             int operandLength = 0;
-            byte[] operandValue = new byte[0];
-            
-            bool isEncrypted = Heap[DATA].Skip(ip).Take(1).ToArray()[0] == 1 ? true : false;
-            ip += 1;
+            bool isEncrypted = sData[ip++] == 1;
 
             if (isEncrypted)
             {
@@ -112,7 +115,7 @@ namespace RegiVM.VMRuntime
                 // IsEncrypted | Number of keys (4) | key1 size | key1 | key2 size | key 2 ... n
                 // | encrypted data LENGTH (4) | encrypted data (opcode + operand length + tag max size + nonce max size)
 
-                var numKeys = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                var numKeys = BitConverter.ToInt32(sData.Slice(ip, 4));
                 ip += 4;
 
                 byte[] encryptedKey = new byte[32];
@@ -121,11 +124,11 @@ namespace RegiVM.VMRuntime
                 {
                     try
                     {
-                        var keySize = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                        var keySize = BitConverter.ToInt32(sData.Slice(ip, 4));
                         ip += 4;
 
                         // Read encrypted key
-                        encryptedKey = Heap[DATA].Skip(ip).Take(keySize).ToArray();
+                        encryptedKey = sData.Slice(ip, keySize).ToArray();
                         ip += keySize;
 
                         // Derive key
@@ -141,10 +144,13 @@ namespace RegiVM.VMRuntime
                     }
                 }
 
-                var dataLength = BitConverter.ToInt32(Heap[DATA].Skip(ip).Take(4).ToArray());
+                var dataLength = BitConverter.ToInt32(sData.Slice(ip, 4));
                 ip += 4;
 
-                data = AesGcmImplementation.Decrypt(Heap[DATA].Skip(ip).Take(dataLength).ToArray(), decryptedKey);
+                var decData = AesGcmImplementation.Decrypt(sData.Slice(ip, dataLength).ToArray(), decryptedKey);
+                // Remake span.
+                ReadOnlySpan<byte> d = decData;
+
                 // IP is now actually at the next instruction.
                 ip += dataLength;
 
@@ -153,24 +159,24 @@ namespace RegiVM.VMRuntime
 
                 var encIP = 0;
                 // Step once
-                opCode = BitConverter.ToUInt64(data.Skip(encIP).Take(8).ToArray());
+                opCode = BitConverter.ToUInt64(d.Slice(encIP, 8));
                 encIP += 8;
 
-                operandLength = BitConverter.ToInt32(data.Skip(encIP).Take(4).ToArray());
+                operandLength = BitConverter.ToInt32(d.Slice(encIP, 4));
                 encIP += 4;
 
-                operandValue = data.Skip(encIP).Take(operandLength).ToArray();
+                operandValue = d.Slice(encIP, operandLength);
             }
             else
             {
                 // Step once
-                opCode = BitConverter.ToUInt64(data.Skip(ip).Take(8).ToArray());
+                opCode = BitConverter.ToUInt64(sData.Slice(ip, 8));
                 ip += 8;
 
-                operandLength = BitConverter.ToInt32(data.Skip(ip).Take(4).ToArray());
+                operandLength = BitConverter.ToInt32(sData.Slice(ip, 4));
                 ip += 4;
 
-                operandValue = data.Skip(ip).Take(operandLength).ToArray();
+                operandValue = sData.Slice(ip, operandLength);
 
                 // Technically may not be next IP but a good indicator.
                 UnstableNextIP = ip + operandLength;
@@ -330,19 +336,19 @@ namespace RegiVM.VMRuntime
             };
         }
 
-        internal DataType ReadDataType(byte[] data, ref int tracker)
+        internal DataType ReadDataType(ReadOnlySpan<byte> data, ref int tracker)
         {
             return (DataType)data[tracker++];
         }
-        internal ComparatorType ReadComparatorType(byte[] data, ref int tracker)
+        internal ComparatorType ReadComparatorType(ReadOnlySpan<byte> data, ref int tracker)
         {
             return (ComparatorType)data[tracker++];
         }
-        internal byte[] ReadBytes(byte[] data, ref int tracker, out int length)
+        internal byte[] ReadBytes(ReadOnlySpan<byte> data, ref int tracker, out int length)
         {
-            length = BitConverter.ToInt32(data.Skip(tracker).Take(4).ToArray());
+            length = BitConverter.ToInt32(data.Slice(tracker, 4));
             tracker += 4;
-            var res = data.Skip(tracker).Take(length).ToArray();
+            var res = data.Slice(tracker, length).ToArray();
             tracker += length;
             return res;
         }

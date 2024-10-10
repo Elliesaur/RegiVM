@@ -9,7 +9,7 @@ namespace RegiVM.VMRuntime.Handlers
 {
     internal static partial class InstructionHandlers
     {
-        internal static int Comparator(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int Comparator(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                        Dictionary<int, object> _)
         {
             // CEQ/CLT/CGT and branch equivs.
@@ -41,7 +41,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int EndFinally(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int EndFinally(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                        Dictionary<int, object> _)
         {
             // TODO: stacked/nested finally clauses...?
@@ -56,30 +56,25 @@ namespace RegiVM.VMRuntime.Handlers
             return offsetToLeaveTo;
         }
 
-        internal static int JumpBool(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int JumpBool(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                      Dictionary<int, object> _)
         {
             int tracker = 0;
             Console.WriteLine("- [JUMP_BOOL]");
 
-            int branchOffsetLength = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int branchOffsetLength = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
             int[] jumpOffsets = new int[branchOffsetLength];
             for (int i = 0; i < branchOffsetLength; i++)
             {
-                jumpOffsets[i] = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                jumpOffsets[i] = BitConverter.ToInt32(d.Slice(tracker, 4));
                 tracker += 4;
             }
+            bool shouldInvert = d[tracker++] == 1;
+            bool isLeaveProtected = d[tracker++] == 1;
 
-
-            //int branchToOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
-            //tracker += 4;
-
-            bool shouldInvert = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
-            bool isLeaveProtected = d.Skip(tracker++).Take(1).ToArray()[0] == 1 ? true : false;
-
-            byte[] shouldSkipTrackerRegName = d.Skip(tracker).ToArray();
+            byte[] shouldSkipTrackerRegName = d[tracker..].ToArray();
             tracker += shouldSkipTrackerRegName.Length;
 
             ByteArrayKey shouldBranchReg = new ByteArrayKey(shouldSkipTrackerRegName);
@@ -249,23 +244,21 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int JumpCall(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> p)
+        internal static int JumpCall(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> p)
         {
             int tracker = 0;
             Console.WriteLine("- [JUMP CALL!!!!]");
 
             // Crying, laughing... Why are you doing this Ellie?
 
-            bool isInline = d.Skip(tracker).Take(1).ToArray()[0] == 1 ? true : false;
-            tracker++;
+            bool isInline = d[tracker++] == 1;
 
-            int methodOffsetToCall = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int methodOffsetToCall = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
-            bool hasReturnValue = d.Skip(tracker).Take(1).ToArray()[0] == 1 ? true : false;
-            tracker++;
+            bool hasReturnValue = d[tracker++] == 1;
 
-            int numParams = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int numParams = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
             // Add param values.
@@ -453,12 +446,12 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int LoadOrStoreRegister(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int LoadOrStoreRegister(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                                 Dictionary<int, object> _)
         {
             // This covers loading and storing.
             int tracker = 0;
-            DataType fromDataType = (DataType)d.Skip(tracker++).Take(1).ToArray()[0];
+            DataType fromDataType = (DataType)d[tracker++];
             Console.WriteLine("- [Load/Store]");
 
             byte[] from = t.ReadBytes(d, ref tracker, out int fromLength);
@@ -489,7 +482,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Duplicate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int Duplicate(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                                 Dictionary<int, object> _)
         {
             // This covers loading and storing.
@@ -514,7 +507,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int ConvertNumber(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int ConvertNumber(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                        Dictionary<int, object> _)
         {
             Console.WriteLine("- [CONVERT NUMBER]");
@@ -618,7 +611,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int NumberLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int NumberLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                        Dictionary<int, object> _)
         {
             Console.WriteLine("- [CONST LOAD]");
@@ -627,16 +620,16 @@ namespace RegiVM.VMRuntime.Handlers
             int tracker = 1;
             int numByteToReadForValue = t.GetByteCountForDataType(numType);
 
-            int registerLength = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int registerLength = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
-            byte[] register = d.Skip(tracker).Take(registerLength).ToArray();
+            byte[] register = d.Slice(tracker, registerLength).ToArray();
             tracker += registerLength;
 
-            int stringLength = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int stringLength = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
-            byte[] value = d.Skip(tracker).Take(numByteToReadForValue == -1 ? stringLength : numByteToReadForValue).ToArray();
+            byte[] value = d.Slice(tracker, numByteToReadForValue == -1 ? stringLength : numByteToReadForValue).ToArray();
             tracker += numByteToReadForValue == -1 ? stringLength : numByteToReadForValue;
 
             ByteArrayKey regKey = new ByteArrayKey(register);
@@ -652,13 +645,13 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
         
-        internal static int ParameterLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int ParameterLoad(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                           Dictionary<int, object> p)
         {
 
             // PARAMETER LOAD
             int tracker = 0;
-            int paramOffset = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int paramOffset = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
             Console.WriteLine($"- [PARAMETER LOAD]");
 
@@ -671,7 +664,7 @@ namespace RegiVM.VMRuntime.Handlers
                 endResult = t.ConvertObjectToHeap(paramData);
             }
 
-            ByteArrayKey regName = new ByteArrayKey(d.Skip(tracker).ToArray());
+            ByteArrayKey regName = new ByteArrayKey(d[tracker..].ToArray());
             tracker += regName.Bytes.Length;
 
             if (!h.ContainsKey(regName))
@@ -685,7 +678,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Ret(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int Ret(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                    Dictionary<int, object> _)
         {
             // RETURN 
@@ -722,41 +715,39 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int StartRegionBlock(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d,
+        internal static int StartRegionBlock(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d,
                                              Dictionary<int, object> _)
         {
             // Exception Handlers
             int tracker = 0;
             Console.WriteLine("- [Region Start]");
 
-            byte blockType = d.Skip(tracker).Take(1).ToArray()[0];
-            tracker++;
+            byte blockType = d[tracker++];
 
-            int handlerCount = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+            int handlerCount = BitConverter.ToInt32(d.Slice(tracker, 4));
             tracker += 4;
 
             List<VMRuntimeExceptionHandler> handlers = new List<VMRuntimeExceptionHandler>();
             for (int i = 0; i < handlerCount; i++)
             {
                 var handler = new VMRuntimeExceptionHandler();
-                handler.Type = (VMBlockType)d.Skip(tracker).Take(1).ToArray()[0];
-                tracker++;
+                handler.Type = (VMBlockType)d[tracker++];
 
-                int handlerOffsetStart = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                int handlerOffsetStart = BitConverter.ToInt32(d.Slice(tracker, 4));
                 tracker += 4;
                 if (handlerOffsetStart > 0)
                 {
                     handler.HandlerOffsetStart = handlerOffsetStart;
                 }
 
-                int filterOffsetStart = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                int filterOffsetStart = BitConverter.ToInt32(d.Slice(tracker, 4));
                 tracker += 4;
                 if (filterOffsetStart > 0)
                 {
                     handler.FilterOffsetStart = filterOffsetStart;
                 }
 
-                uint exceptionTypeToken = BitConverter.ToUInt32(d.Skip(tracker).Take(4).ToArray());
+                uint exceptionTypeToken = BitConverter.ToUInt32(d.Slice(tracker, 4));
                 tracker += 4;
                 if (exceptionTypeToken != 0)
                 {
@@ -766,7 +757,7 @@ namespace RegiVM.VMRuntime.Handlers
                 byte[] exceptionObjectKey = t.ReadBytes(d, ref tracker, out var exceptionObjectKeyLength);
                 handler.ExceptionTypeObjectKey = exceptionObjectKey;
 
-                int id = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
+                int id = BitConverter.ToInt32(d.Slice(tracker, 4));
                 tracker += 4;
                 handler.Id = id;
                 t.ExceptionHandlers.Push(handler);

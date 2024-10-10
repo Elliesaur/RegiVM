@@ -10,7 +10,7 @@ namespace RegiVM.VMRuntime.Handlers
 {
     internal static partial class InstructionHandlers
     {
-        internal static int Add(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Add(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // ADD 
             int tracker = 0;
@@ -41,7 +41,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int And(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int And(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // XOR 
             int tracker = 0;
@@ -72,7 +72,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Div(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Div(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // DIV 
             int tracker = 0;
@@ -103,7 +103,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Mul(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Mul(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // MUL 
             int tracker = 0;
@@ -134,7 +134,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Or(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Or(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // OR 
             int tracker = 0;
@@ -165,7 +165,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Sub(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Sub(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // SUB 
             int tracker = 0;
@@ -196,7 +196,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Xor(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Xor(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // XOR 
             int tracker = 0;
@@ -227,7 +227,7 @@ namespace RegiVM.VMRuntime.Handlers
             return tracker;
         }
 
-        internal static int Neg(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Neg(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // NEG 
             int tracker = 0;
@@ -253,7 +253,7 @@ namespace RegiVM.VMRuntime.Handlers
             }
             return tracker;
         }
-        internal static int Not(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, byte[] d, Dictionary<int, object> _)
+        internal static int Not(RegiVMRuntime t, Dictionary<ByteArrayKey, byte[]> h, ReadOnlySpan<byte> d, Dictionary<int, object> _)
         {
             // NOT 
             int tracker = 0;
