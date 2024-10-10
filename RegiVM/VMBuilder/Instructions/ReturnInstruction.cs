@@ -38,7 +38,6 @@ namespace RegiVM.VMBuilder.Instructions
                 writer.Write(HasReturnValue);
                 if (HasReturnValue)
                 {
-                    //writer.Write((byte)TempReg1!.DataType);
                     writer.Write(TempReg1!.RawName.Length);
                     writer.Write(TempReg1!.RawName);
                 }

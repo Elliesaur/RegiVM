@@ -16,7 +16,7 @@ namespace RegiVM.VMRuntime
         // A heap which contains a list of bytes, the key is the register.
         private Dictionary<ByteArrayKey, byte[]> Heap { get; } = new Dictionary<ByteArrayKey, byte[]>();
 
-        // Special heap for objects? Idk... maybe redo this.
+        // Special heap for objects.
         private Dictionary<ByteArrayKey, object> ObjectHeap { get; } = new Dictionary<ByteArrayKey, object>();
 
         // TODO: Calculate max opcode supported.
@@ -26,13 +26,13 @@ namespace RegiVM.VMRuntime
 
         public StackList<VMMethodSig> MethodSignatures { get; } = new StackList<VMMethodSig>();
 
-        public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; }
+        public VMRuntimeExceptionHandler ActiveExceptionHandler { get; set; } = null!;
 
         public StackList<VMRuntimeExceptionHandler> ExceptionHandlers { get; } = new StackList<VMRuntimeExceptionHandler>();
 
-        public int CurrentIPStart { get; set; }
+        public int CurrentIPStart { get; set; } = 0;
         public Stack<int> IP { get; set; } = new Stack<int>();
-        public int UnstableNextIP { get; set; }
+        public int UnstableNextIP { get; set; } = 0;
 
         internal RegiVMRuntime(bool isCompressed, byte[] data, params object[] parameters)
         {
@@ -254,8 +254,6 @@ namespace RegiVM.VMRuntime
 
         internal RegiVMRuntime Run()
         {
-            //Stopwatch sw = new Stopwatch();
-            //sw.Start();
             int ip = 0;
 
             // It is the first item, we know there is literally no others.
@@ -276,10 +274,6 @@ namespace RegiVM.VMRuntime
 
                 Heap[INSTRUCTION_POINTER] = BitConverter.GetBytes(ip);
             }
-            //sw.Stop();
-
-            //Console.WriteLine(sw.ElapsedTicks);
-
             return this;
         }
 
@@ -355,11 +349,6 @@ namespace RegiVM.VMRuntime
 
         internal byte[] PerformComparison(ComparatorType cType, DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
         {
-            //if (leftDataType != rightDataType)
-            //{
-                // We cannot determine and should not determine the crazy amounts of options.
-            
-            
             object leftObj = GetConstObject(leftDataType, left);
             object rightObj = GetConstObject(rightDataType, right);
             if (leftObj.GetType() != rightObj.GetType())
@@ -407,25 +396,6 @@ namespace RegiVM.VMRuntime
                 ComparatorType.IsLessThanOrEqualUnsignedUnordered => leftObjD <= rightObjD,
             };
             return [(byte)(result ? 1 : 0)];
-            //}
-            
-            // TODO: Figure out a way that is independent of switch statements... Anon method? ILProcessor?
-            
-            //bool result = leftDataType switch
-            //{
-            //    DataType.Int32 => BitConverter.GetBytes(BitConverter.ToInt32(left) + BitConverter.ToInt32(right)),
-            //    DataType.UInt32 => BitConverter.GetBytes(BitConverter.ToUInt32(left) + BitConverter.ToUInt32(right)),
-            //    DataType.Int64 => BitConverter.GetBytes(BitConverter.ToInt64(left) + BitConverter.ToInt64(right)),
-            //    DataType.UInt64 => BitConverter.GetBytes(BitConverter.ToUInt64(left) + BitConverter.ToUInt64(right)),
-            //    DataType.Int8 => BitConverter.GetBytes((sbyte)left[0] + (sbyte)right[0]), // Assuming sbyte for Int8
-            //    DataType.UInt8 => BitConverter.GetBytes(left[0] + right[0]),
-            //    DataType.Int16 => BitConverter.GetBytes(BitConverter.ToInt16(left) + BitConverter.ToInt16(right)),
-            //    DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) + BitConverter.ToUInt16(right)),
-            //    DataType.Single => BitConverter.GetBytes(BitConverter.ToSingle(left) + BitConverter.ToSingle(right)),
-            //    DataType.Double => BitConverter.GetBytes(BitConverter.ToDouble(left) + BitConverter.ToDouble(right)),
-            //    //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
-            //};
-            //return [(byte)(result ? 1 : 0)];
         }
 
         internal byte[] PerformAddition(DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
@@ -503,7 +473,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) - BitConverter.ToUInt16(right)),
                 DataType.Single => BitConverter.GetBytes(BitConverter.ToSingle(left) - BitConverter.ToSingle(right)),
                 DataType.Double => BitConverter.GetBytes(BitConverter.ToDouble(left) - BitConverter.ToDouble(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -531,7 +500,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) * BitConverter.ToUInt16(right)),
                 DataType.Single => BitConverter.GetBytes(BitConverter.ToSingle(left) * BitConverter.ToSingle(right)),
                 DataType.Double => BitConverter.GetBytes(BitConverter.ToDouble(left) * BitConverter.ToDouble(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -560,7 +528,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) / BitConverter.ToUInt16(right)),
                 DataType.Single => BitConverter.GetBytes(BitConverter.ToSingle(left) / BitConverter.ToSingle(right)),
                 DataType.Double => BitConverter.GetBytes(BitConverter.ToDouble(left) / BitConverter.ToDouble(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -586,7 +553,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt8 => BitConverter.GetBytes(left[0] ^ right[0]),
                 DataType.Int16 => BitConverter.GetBytes(BitConverter.ToInt16(left) ^ BitConverter.ToInt16(right)),
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) ^ BitConverter.ToUInt16(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -597,7 +563,6 @@ namespace RegiVM.VMRuntime
                 DataType.Int32 => BitConverter.GetBytes(-(Int32)BitConverter.ToInt32(left)),
                 DataType.Int64 => BitConverter.GetBytes(-(Int64)BitConverter.ToInt64(left)),
                 DataType.Int16 => BitConverter.GetBytes(-(Int16)BitConverter.ToInt16(left)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -612,7 +577,6 @@ namespace RegiVM.VMRuntime
                 DataType.Int8 or DataType.UInt8 => new byte[] { (byte)~left[0] }, // Assuming sbyte for Int8
                 DataType.Int16 => BitConverter.GetBytes((Int16)~BitConverter.ToInt16(left)),
                 DataType.UInt16 => BitConverter.GetBytes((UInt16)~BitConverter.ToUInt16(left)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
         internal byte[] PerformOr(DataType leftDataType, DataType rightDataType, byte[] left, byte[] right)
@@ -637,7 +601,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt8 => BitConverter.GetBytes(left[0] | right[0]),
                 DataType.Int16 => BitConverter.GetBytes(BitConverter.ToInt16(left) | BitConverter.ToInt16(right)),
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) | BitConverter.ToUInt16(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
 
@@ -663,7 +626,6 @@ namespace RegiVM.VMRuntime
                 DataType.UInt8 => BitConverter.GetBytes(left[0] & right[0]),
                 DataType.Int16 => BitConverter.GetBytes(BitConverter.ToInt16(left) & BitConverter.ToInt16(right)),
                 DataType.UInt16 => BitConverter.GetBytes(BitConverter.ToUInt16(left) & BitConverter.ToUInt16(right)),
-                //_ => throw new ArgumentOutOfRangeException(nameof(dataType), $"Unsupported DataType: {dataType}")
             };
         }
         internal object GetConstObject(DataType dataType, byte[] val, DataType altDataType = DataType.Unknown)

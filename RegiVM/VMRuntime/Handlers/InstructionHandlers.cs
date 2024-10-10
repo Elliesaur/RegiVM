@@ -696,7 +696,6 @@ namespace RegiVM.VMRuntime.Handlers
             ByteArrayKey result = default;
             if (hasValue)
             {
-                //DataType retDt = t.ReadDataType(d, ref tracker);
                 byte[] retValueReg = t.ReadBytes(d, ref tracker, out int _);
                 result = new ByteArrayKey(retValueReg);
             }
@@ -735,6 +734,7 @@ namespace RegiVM.VMRuntime.Handlers
 
             int handlerCount = BitConverter.ToInt32(d.Skip(tracker).Take(4).ToArray());
             tracker += 4;
+
             List<VMRuntimeExceptionHandler> handlers = new List<VMRuntimeExceptionHandler>();
             for (int i = 0; i < handlerCount; i++)
             {
