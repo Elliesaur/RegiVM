@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Security.Cryptography;
 
 namespace RegiVM.VMRuntime

@@ -88,7 +88,7 @@ namespace RegiVM.VMBuilder.Instructions
             // Derive and add encryption keys for referenced by.
             foreach (var referencedBy in ReferencedByInstruction)
             {
-                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(referencedBy.Offset), BitConverter.GetBytes(Offset), 10000 + Offset, HashAlgorithmName.SHA512, 32);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(referencedBy.Offset), BitConverter.GetBytes(Offset), (Offset % VMCompiler.DerivedPbkdf2Mod) == 0 ? VMCompiler.DerivedPbkdf2ModIfZero : (Offset % VMCompiler.DerivedPbkdf2Mod), HashAlgorithmName.SHA512, 32);
                 var encryptedMasterKey = AesGcmImplementation.Encrypt(MasterEncryptionKey, derivedKey);
 
                 EncryptionKeys.Add(encryptedMasterKey);
@@ -97,7 +97,7 @@ namespace RegiVM.VMBuilder.Instructions
             if (EncryptionKeys.Count == 0)
             {
                 // Add for fallthrough.
-                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(previousInstructionForFallthrough.Offset), BitConverter.GetBytes(Offset), 10000 + Offset, HashAlgorithmName.SHA512, 32);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(previousInstructionForFallthrough.Offset), BitConverter.GetBytes(Offset), (Offset % VMCompiler.DerivedPbkdf2Mod) == 0 ? VMCompiler.DerivedPbkdf2ModIfZero : (Offset % VMCompiler.DerivedPbkdf2Mod), HashAlgorithmName.SHA512, 32);
                 var encryptedMasterKey = AesGcmImplementation.Encrypt(MasterEncryptionKey, derivedKey);
 
                 EncryptionKeys.Add(encryptedMasterKey);
@@ -109,7 +109,7 @@ namespace RegiVM.VMBuilder.Instructions
         /// </summary>
         public void InitializeMasterKey()
         {
-            MasterEncryptionKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(OpCode), BitConverter.GetBytes(Offset), 10000 + Offset, HashAlgorithmName.SHA512, 32);
+            MasterEncryptionKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(OpCode), BitConverter.GetBytes(Offset), (Offset % VMCompiler.DerivedPbkdf2Mod) == 0 ? VMCompiler.DerivedPbkdf2ModIfZero : (Offset % VMCompiler.DerivedPbkdf2Mod), HashAlgorithmName.SHA512, 32);
         }
 
         /// <summary>

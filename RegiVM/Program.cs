@@ -43,7 +43,7 @@ namespace RegiVM
 
             var compiler = new VMCompiler()
                 .RandomizeOpCodes()
-                .Encrypt(true, VMEncryptionType.MultiPathOnly)
+                .Encrypt(true, VMEncryptionType.MultiPathOnly, 20000)
                 .Compress(true)
                 .InlineCallDepth(2)
                 .RegisterLimit(30);

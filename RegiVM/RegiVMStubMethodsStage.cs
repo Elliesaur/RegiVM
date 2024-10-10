@@ -78,29 +78,10 @@ namespace RegiVM
                 // Store the regivm as an object.
                 body.Instructions.Add(new CilInstruction(CilOpCodes.Stloc_0));
 
-
-                // Add opcode handlers.
-                // ldloc.0
-                // callvirt <get opcode handlers>
-                // ldc.i8 <opcode>
-                // ldnull (for object instance)
-                // ldftn <handler method>
-                // newobj <func delegate ctor>(object, native int)
-                // callvirt <funcdict add>
                 var opCodeNames = comp.Compiler.OpCodes.GetAllOpCodesWithNames();
-
-                //var shit = comp.InjectedHandlerAddMethod.DeclaringType.MakeGenericInstanceType(t.Module.CorLibTypeFactory.UInt64);
-                //var memberRef = shit.GenericType.CreateMemberReference(comp.InjectedHandlerAddMethod.Name, comp.InjectedHandlerAddMethod.Signature);
-
-                //var typeDeff = typeSig.Resolve();
 
                 // Move methods over to current type.
                 var handlerMethodsUsed = comp.OpCodes.ToDictionary(k => k, v => comp.InjectedRegiVMInstructionHandlersType.Methods.Single(x => x.Name == opCodeNames[v]));
-                //var parentType = comp.Method.DeclaringType;
-                //foreach (var m in handlerMethodsUsed)
-                //{
-                //    m.Value.DeclaringType = parentType;
-                //}
 
                 foreach (var usedOpCode in comp.OpCodes)
                 {
@@ -163,10 +144,23 @@ namespace RegiVM
                     }
                 }
 
+
+                foreach (var inst in comp.InjectedStepMethod.CilMethodBody!.Instructions)
+                {
+                    if (inst.IsLdcI4() && inst.GetLdcI4Constant() == 999991)
+                    {
+                        // Use the mod from the compiler.
+                        inst.Operand = VMCompiler.DerivedPbkdf2Mod;
+                    }
+                    if (inst.IsLdcI4() && inst.GetLdcI4Constant() == 9999111)
+                    {
+                        // Use the mod from the compiler.
+                        inst.Operand = VMCompiler.DerivedPbkdf2ModIfZero;
+                    }
+                }
+
                 // Just rename type again.
                 Parent.RenameSubTypes(comp.InjectedRegiVMInstructionHandlersType);
-
-                //t.Module.TopLevelTypes.Remove(comp.InjectedRegiVMInstructionHandlersType);
             }
         }
 

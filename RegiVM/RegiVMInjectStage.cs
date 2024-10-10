@@ -62,6 +62,7 @@ namespace RegiVM
                             {
                                 comp.InjectedRegiVM = typeDef;
                                 comp.InjectedRunMethod = comp.InjectedRegiVM.Methods.Single(x => x.Name == "Run");
+                                comp.InjectedStepMethod = comp.InjectedRegiVM.Methods.Single(x => x.Name == "Step");
                                 comp.InjectedRegiVMConstructor = comp.InjectedRegiVM.Methods.Single(x => x.Name == ".ctor");
                                 comp.InjectedReturnValMethod = comp.InjectedRegiVM.Methods.Single(x => x.Name == "GetReturnValue");
                                 comp.InjectedOpCodeHandlerProperty = comp.InjectedRegiVM.Properties.Single(x => x.Name == "OpCodeHandlers");

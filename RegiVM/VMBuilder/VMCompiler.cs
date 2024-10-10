@@ -28,6 +28,9 @@ namespace RegiVM.VMBuilder
 
     public partial class VMCompiler
     {
+        public static int DerivedPbkdf2Mod = 20000;
+        public static int DerivedPbkdf2ModIfZero = 105;
+
         public RegisterHelper RegisterHelper { get; private set; }
         
         public InstructionBuilder InstructionBuilder { get; }
@@ -74,10 +77,11 @@ namespace RegiVM.VMBuilder
             return this;
         }
 
-        public VMCompiler Encrypt(bool encrypt, VMEncryptionType encType)
+        public VMCompiler Encrypt(bool encrypt, VMEncryptionType encType, int derivedRoundsMod)
         {
             EncryptInstructions = encrypt;
             EncryptionOption = encType;
+            DerivedPbkdf2Mod = derivedRoundsMod;
             return this;
         }
 

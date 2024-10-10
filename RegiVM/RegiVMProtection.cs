@@ -108,6 +108,7 @@ namespace RegiVM
             public TypeDefinition InjectedRegiVMInstructionHandlersType { get; internal set; }
             public TypeDefinition InjectedFuncDict { get; internal set; }
             public TypeDefinition InjectedFuncDelegate { get; internal set; }
+            public MethodDefinition InjectedStepMethod { get; internal set; }
         }
     }
 }

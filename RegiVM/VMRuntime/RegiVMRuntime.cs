@@ -130,10 +130,10 @@ namespace RegiVM.VMRuntime
                         // Read encrypted key
                         encryptedKey = sData.Slice(ip, keySize).ToArray();
                         ip += keySize;
-
+                        
                         // Derive key
-                        var derivedEncryptedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(prev), BitConverter.GetBytes(current), 10000 + current, HashAlgorithmName.SHA512, 32);
-
+                        var derivedEncryptedKey = Rfc2898DeriveBytes.Pbkdf2(BitConverter.GetBytes(prev), BitConverter.GetBytes(current), (current % 999991) == 0 ? 9999111 : (current % 999991), HashAlgorithmName.SHA512, 32);
+                        
                         // Decrypt key using current offset + previous offset.
                         decryptedKey = AesGcmImplementation.Decrypt(encryptedKey, derivedEncryptedKey);
                     }
@@ -148,6 +148,7 @@ namespace RegiVM.VMRuntime
                 ip += 4;
 
                 var decData = AesGcmImplementation.Decrypt(sData.Slice(ip, dataLength).ToArray(), decryptedKey);
+
                 // Remake span.
                 ReadOnlySpan<byte> d = decData;
 
@@ -292,7 +293,6 @@ namespace RegiVM.VMRuntime
                 DataType.Int32 or DataType.UInt32 or DataType.Single => 4,
                 DataType.Int64 or DataType.UInt64 or DataType.Double => 8,
                 DataType.String => -1
-                //_ => throw new ArgumentOutOfRangeException(nameof(numType), $"Unsupported DataType: {numType}")
             };
         }
 
